@@ -45,6 +45,7 @@ from app.modules.fraud_ops.routes import router as fraud_ops_router
 from app.modules.portfolio.routes import (
     portfolio_router, dashboard_router,
     compliance_router, market_router, workspace_router,
+    workflow_router,
 )
 
 PREFIX = settings.API_V1_PREFIX
@@ -61,6 +62,7 @@ app.include_router(dashboard_router, prefix=PREFIX)
 app.include_router(compliance_router, prefix=PREFIX)
 app.include_router(market_router, prefix=PREFIX)
 app.include_router(workspace_router, prefix=PREFIX)
+app.include_router(workflow_router, prefix=PREFIX)
 
 # Legacy routes that still work
 try:

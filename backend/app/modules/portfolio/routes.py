@@ -1,27 +1,32 @@
-"""API Routes: Portfolio, Dashboard, Compliance, Market Intel, Workspace — Carbon Verify v3."""
+"""API Routes: Portfolio, Dashboard, Compliance, Market Intel, Workspace — Carbon Verify v4."""
 import math
 import random
+import io
 from typing import Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from app.core.database import get_db
-from app.core.auth import get_current_user
+from app.core.auth import get_current_user, require_role
 from app.models.models import (
     Portfolio, PortfolioPosition, CreditBatch, CarbonProject, ProjectRating,
     User, Workspace, WorkspaceMembership, ComplianceFramework, ComplianceMapping,
-    ApprovalFlow, ApprovalStep, CarbonPriceHistory, MarketPrice,
+    ApprovalFlow, ApprovalStep, CarbonPriceHistory, MarketPrice, FraudAlert,
+    Jurisdiction,
 )
-from app.models.schemas import PortfolioCreate, PositionCreate
+from app.models.schemas import PortfolioCreate, PositionCreate, ApprovalFlowCreate, ApprovalStepUpdate
 from app.modules.portfolio.service import (
     calculate_portfolio_metrics, get_dashboard_metrics,
     calculate_risk_adjusted_tonnes,
 )
 from app.modules.compliance.service import (
     get_compliance_summary, map_project_to_csrd, map_project_to_sbti, map_project_to_icvcm,
+    generate_csrd_package, generate_csrd_pdf,
 )
+from app.modules.compliance.adapter import get_jurisdiction_summary
 from app.modules.market_intel.service import calculate_frontier, suggest_rebalance
 from app.modules.workspace.service import (
     get_profile_config, get_all_profiles, check_permission, get_visible_modules,
@@ -35,8 +40,10 @@ portfolio_router = APIRouter(prefix="/portfolios", tags=["Portfólio"])
 
 
 @portfolio_router.get("")
-async def list_portfolios(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Portfolio))
+async def list_portfolios(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    result = await db.execute(
+        select(Portfolio).where(Portfolio.organization_id == user.organization_id)
+    )
     portfolios = result.scalars().all()
     return [
         {"id": p.id, "name": p.name, "organization_id": p.organization_id,
@@ -108,8 +115,8 @@ dashboard_router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @dashboard_router.get("/metrics")
-async def dashboard_metrics(db: AsyncSession = Depends(get_db)):
-    return await get_dashboard_metrics(db, 1)
+async def dashboard_metrics(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    return await get_dashboard_metrics(db, user.organization_id)
 
 
 @dashboard_router.get("/risk-matrix")
@@ -217,6 +224,78 @@ async def get_portfolio_compliance(portfolio_id: int, db: AsyncSession = Depends
     return summary
 
 
+@compliance_router.get("/jurisdiction/{project_id}")
+async def get_jurisdiction_context(project_id: int, db: AsyncSession = Depends(get_db)):
+    """Get jurisdiction-specific regulatory context for a project."""
+    result = await db.execute(
+        select(CarbonProject).options(selectinload(CarbonProject.rating))
+        .where(CarbonProject.id == project_id)
+    )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Projeto não encontrado")
+    # Find jurisdiction by country
+    jur_result = await db.execute(
+        select(Jurisdiction).where(Jurisdiction.code == _country_to_code(project.country))
+    )
+    jurisdiction = jur_result.scalar_one_or_none()
+    return get_jurisdiction_summary(project, jurisdiction)
+
+
+def _country_to_code(country: str) -> str:
+    """Map country name to jurisdiction code."""
+    mapping = {
+        "Brazil": "BR", "Brasil": "BR", "Colombia": "CO", "Colômbia": "CO",
+        "Peru": "PE", "Mexico": "MX", "México": "MX", "Argentina": "AR",
+        "Chile": "CL", "Ecuador": "EC", "Equador": "EC", "Bolivia": "BO",
+        "Bolívia": "BO", "United States": "US", "Estados Unidos": "US",
+        "Indonesia": "ID", "Indonésia": "ID", "India": "IN", "Índia": "IN",
+        "Kenya": "KE", "Quênia": "KE", "Ghana": "GH", "Gana": "GH",
+    }
+    return mapping.get(country, country[:2].upper())
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CSRD PACKAGE EXPORT
+# ═══════════════════════════════════════════════════════════════════════════
+
+@portfolio_router.get("/{portfolio_id}/csrd-package")
+async def get_csrd_package(portfolio_id: int, db: AsyncSession = Depends(get_db)):
+    """Export CSRD compliance package as JSON."""
+    compliance = await get_portfolio_compliance(portfolio_id, db)
+    portfolio = (await db.execute(select(Portfolio).where(Portfolio.id == portfolio_id))).scalar_one_or_none()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfólio não encontrado")
+    metrics = await calculate_portfolio_metrics(db, portfolio_id)
+    return generate_csrd_package(
+        portfolio_name=portfolio.name,
+        portfolio_id=portfolio_id,
+        compliance_summary=compliance,
+        portfolio_metrics=metrics,
+    )
+
+
+@portfolio_router.get("/{portfolio_id}/csrd-pdf")
+async def get_csrd_pdf(portfolio_id: int, db: AsyncSession = Depends(get_db)):
+    """Export CSRD compliance package as PDF."""
+    compliance = await get_portfolio_compliance(portfolio_id, db)
+    portfolio = (await db.execute(select(Portfolio).where(Portfolio.id == portfolio_id))).scalar_one_or_none()
+    if not portfolio:
+        raise HTTPException(status_code=404, detail="Portfólio não encontrado")
+    metrics = await calculate_portfolio_metrics(db, portfolio_id)
+    pdf_bytes = generate_csrd_pdf(
+        portfolio_name=portfolio.name,
+        portfolio_id=portfolio_id,
+        compliance_summary=compliance,
+        portfolio_metrics=metrics,
+    )
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=csrd_package_portfolio_{portfolio_id}.pdf"},
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # MARKET INTELLIGENCE ROUTES
 # ═══════════════════════════════════════════════════════════════════════════
@@ -288,8 +367,10 @@ workspace_router = APIRouter(prefix="/workspaces", tags=["Workspaces"])
 
 
 @workspace_router.get("")
-async def list_workspaces(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Workspace))
+async def list_workspaces(db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
+    result = await db.execute(
+        select(Workspace).where(Workspace.organization_id == user.organization_id)
+    )
     workspaces = result.scalars().all()
     return [
         {"id": w.id, "name": w.name, "organization_id": w.organization_id,
@@ -342,3 +423,97 @@ async def list_approval_flows(workspace_id: int, db: AsyncSession = Depends(get_
                     "user_id": s.user_id, "decided_at": s.decided_at} for s in (f.steps or [])]}
         for f in flows
     ]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# APPROVAL WORKFLOW CRUD
+# ═══════════════════════════════════════════════════════════════════════════
+
+workflow_router = APIRouter(prefix="/workflows", tags=["Approval Workflows"])
+
+
+@workflow_router.post("", status_code=201)
+async def create_workflow(
+    workspace_id: int = Query(...),
+    data: ApprovalFlowCreate = None,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Create a new approval workflow for a workspace."""
+    ws = (await db.execute(select(Workspace).where(Workspace.id == workspace_id))).scalar_one_or_none()
+    if not ws or ws.organization_id != user.organization_id:
+        raise HTTPException(status_code=404, detail="Workspace não encontrado")
+    flow = ApprovalFlow(
+        workspace_id=workspace_id,
+        name=data.name if data else "New Workflow",
+        flow_type=data.flow_type if data else "credit_purchase",
+        required_steps=data.required_steps if data else 1,
+    )
+    db.add(flow)
+    await db.commit()
+    await db.refresh(flow)
+    return {"id": flow.id, "name": flow.name, "flow_type": flow.flow_type, "message": "Workflow criado"}
+
+
+@workflow_router.get("/{workflow_id}")
+async def get_workflow(workflow_id: int, db: AsyncSession = Depends(get_db)):
+    """Get a workflow with its decision tree."""
+    result = await db.execute(
+        select(ApprovalFlow).options(selectinload(ApprovalFlow.steps))
+        .where(ApprovalFlow.id == workflow_id)
+    )
+    flow = result.scalar_one_or_none()
+    if not flow:
+        raise HTTPException(status_code=404, detail="Workflow não encontrado")
+    steps = sorted(flow.steps or [], key=lambda s: s.step_order)
+    completed = sum(1 for s in steps if (s.status.value if hasattr(s.status, 'value') else str(s.status)) in ("approved", "rejected"))
+    return {
+        "id": flow.id, "name": flow.name, "flow_type": flow.flow_type,
+        "required_steps": flow.required_steps, "is_active": flow.is_active,
+        "progress": f"{completed}/{len(steps)}",
+        "steps": [
+            {
+                "id": s.id, "step_order": s.step_order,
+                "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
+                "user_id": s.user_id, "role_required": s.role_required,
+                "decision_note": s.decision_note, "decided_at": s.decided_at,
+                "created_at": s.created_at,
+            }
+            for s in steps
+        ],
+    }
+
+
+@workflow_router.post("/{workflow_id}/steps", status_code=201)
+async def add_workflow_step(
+    workflow_id: int,
+    data: ApprovalStepUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Register a decision on a workflow step."""
+    flow = (await db.execute(
+        select(ApprovalFlow).options(selectinload(ApprovalFlow.steps))
+        .where(ApprovalFlow.id == workflow_id)
+    )).scalar_one_or_none()
+    if not flow:
+        raise HTTPException(status_code=404, detail="Workflow não encontrado")
+
+    next_order = len(flow.steps) + 1 if flow.steps else 1
+    step = ApprovalStep(
+        flow_id=workflow_id,
+        step_order=next_order,
+        user_id=user.id,
+        status=data.status,
+        decision_note=data.decision_note,
+        decided_at=datetime.now(timezone.utc),
+    )
+    db.add(step)
+    await db.commit()
+    await db.refresh(step)
+    return {
+        "id": step.id, "step_order": step.step_order,
+        "status": step.status.value if hasattr(step.status, 'value') else str(step.status),
+        "user_id": step.user_id, "decided_at": step.decided_at,
+        "message": "Decisão registrada",
+    }

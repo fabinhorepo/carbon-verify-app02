@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.database import get_db
 
 security = HTTPBearer()
+security_optional = HTTPBearer(auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -28,7 +29,7 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
@@ -57,3 +58,36 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Usuário não encontrado ou inativo")
     return user
+
+
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_optional),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns current user if authenticated, None otherwise."""
+    if not credentials:
+        return None
+    try:
+        return await get_current_user(credentials, db)
+    except HTTPException:
+        return None
+
+
+def require_role(*allowed_roles: str):
+    """Dependency factory that checks if user has one of the allowed roles.
+
+    Usage: Depends(require_role("admin", "analyst"))
+    """
+    async def _check(
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        db: AsyncSession = Depends(get_db),
+    ):
+        user = await get_current_user(credentials, db)
+        user_role = user.role.value if hasattr(user.role, 'value') else str(user.role)
+        if user_role not in allowed_roles:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Acesso negado. Papel '{user_role}' não tem permissão. Requer: {', '.join(allowed_roles)}"
+            )
+        return user
+    return _check

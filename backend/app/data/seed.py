@@ -15,10 +15,11 @@ from app.models.models import (
     CarbonPriceHistory, SatelliteObservation, CorporateEmission,
     CarbonBalance, IntegrationSync, MetricSnapshot,
     Entity, EntityRelation, Jurisdiction, Workspace, WorkspaceMembership,
-    ComplianceFramework, MarketPrice,
+    ComplianceFramework, ComplianceMapping, MarketPrice,
+    ApprovalFlow, ApprovalStep,
     ProjectType, RatingGrade, FraudSeverity, UserRole,
     WorkspaceProfileType, EntityType, ComplianceFrameworkType,
-    IntegrationSource,
+    IntegrationSource, ApprovalStatus,
 )
 from app.modules.rating.service import calculate_rating
 from app.modules.fraud_ops.service import run_fraud_detection
@@ -278,5 +279,56 @@ async def run_seed():
             offsets = rng.uniform(10000, 40000)
             db.add(CarbonBalance(organization_id=org.id, period=period, total_emissions=round(emissions, 2), total_offsets=round(offsets, 2), net_balance=round(emissions - offsets, 2)))
 
+        # ─── Approval Workflows ──────────────────────────────────────────
+        flow_configs = [
+            ("Aprovação de Compra de Créditos", "credit_purchase", 3, workspaces[0].id),
+            ("Revisão de Compliance CSRD", "csrd_review", 2, workspaces[1].id),
+            ("Validação Jurídica", "legal_review", 2, workspaces[2].id),
+        ]
+        for flow_name, flow_type, req_steps, ws_id in flow_configs:
+            flow = ApprovalFlow(
+                workspace_id=ws_id, name=flow_name,
+                flow_type=flow_type, required_steps=req_steps,
+            )
+            db.add(flow)
+        await db.flush()
+
+        # Add sample steps to first workflow
+        flow_result = await db.execute(select(ApprovalFlow).limit(1))
+        first_flow = flow_result.scalar_one_or_none()
+        if first_flow:
+            step_data = [
+                (1, admin.id, "sustainability", ApprovalStatus.APPROVED, "Projeto atende critérios de qualidade."),
+                (2, analyst.id, "risk_compliance", ApprovalStatus.APPROVED, "Risco operacional aceitável."),
+                (3, admin.id, "procurement", ApprovalStatus.PENDING, None),
+            ]
+            for order, uid, role, status, note in step_data:
+                step = ApprovalStep(
+                    flow_id=first_flow.id, step_order=order,
+                    user_id=uid, role_required=role,
+                    status=status, decision_note=note,
+                    decided_at=datetime.now(timezone.utc) - timedelta(days=rng.randint(1, 10)) if status != ApprovalStatus.PENDING else None,
+                )
+                db.add(step)
+            await db.flush()
+
+        # ─── Compliance Mappings ────────────────────────────────────────
+        csrd_fw = frameworks[0]
+        for i, project in enumerate(projects[:5]):
+            for disc_item in ["E1-1", "E1-5", "E1-7", "E1-9"]:
+                coverage = rng.uniform(30, 95)
+                status_val = "verified" if coverage >= 80 else "mapped" if coverage >= 40 else "gap"
+                mapping = ComplianceMapping(
+                    framework_id=csrd_fw.id,
+                    project_id=project.id,
+                    portfolio_id=portfolio.id,
+                    disclosure_item=disc_item,
+                    status=status_val,
+                    coverage_pct=round(coverage, 1),
+                    evidence_summary=f"Evidência auto-gerada para {project.name} / {disc_item}",
+                )
+                db.add(mapping)
+        await db.flush()
+
         await db.commit()
-        print(f"✅ Seed v3: {len(projects)} projetos, {len(jurisdictions)} jurisdições, {len(entities)} entidades, {len(workspaces)} workspaces criados.")
+        print(f"✅ Seed v3: {len(projects)} projetos, {len(jurisdictions)} jurisdições, {len(entities)} entidades, {len(workspaces)} workspaces, 3 workflows criados.")
