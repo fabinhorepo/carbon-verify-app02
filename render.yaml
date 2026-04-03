@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: carbon-verify-app01
+    name: carbon-verify-app02
     runtime: docker
     plan: starter
     dockerfilePath: ./Dockerfile
+    region: oregon
     healthCheckPath: /api/v1/health
     envVars:
       - key: SECRET_KEY
@@ -15,7 +16,7 @@ services:
       - key: PORT
         value: "10000"
       - key: CORS_ORIGINS
-        value: "https://carbon-verify-app01.onrender.com"
+        value: "https://carbon-verify-app02.onrender.com"
       - key: RATE_LIMIT_PER_MINUTE
         value: "120"
       - key: NASA_FIRMS_API_KEY
