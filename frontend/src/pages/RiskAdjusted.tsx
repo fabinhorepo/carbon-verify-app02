@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Scale, ArrowUpDown, TrendingUp, AlertTriangle, Calculator, BarChart3 } from 'lucide-react';
+import { Scale, ArrowUpDown, AlertTriangle, Calculator, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const gradeColors: Record<string, string> = {
