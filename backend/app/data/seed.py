@@ -72,8 +72,8 @@ async def run_seed():
 
         for pd in PROJECTS_DATA:
             avail = pd["credits"] - pd["retired"]
-            start_d = datetime(pd["vintage"] - 2, 1, 1, tzinfo=timezone.utc)
-            end_d = datetime(pd["vintage"] + rng.randint(10, 25), 12, 31, tzinfo=timezone.utc)
+            start_d = datetime(pd["vintage"] - 2, 1, 1)
+            end_d = datetime(pd["vintage"] + rng.randint(10, 25), 12, 31)
 
             project = CarbonProject(
                 name=pd["name"], project_type=pd["type"], country=pd["country"],
@@ -109,7 +109,7 @@ async def run_seed():
                     serial_number=f"CV-{project.id}-{ci+1:04d}",
                     project_id=project.id, vintage_year=pd["vintage"],
                     quantity=max(100, qty), price_eur=round(price, 2),
-                    issuance_date=datetime(pd["vintage"], rng.randint(1, 12), rng.randint(1, 28), tzinfo=timezone.utc),
+                    issuance_date=datetime(pd["vintage"], rng.randint(1, 12), rng.randint(1, 28)),
                 )
                 db.add(credit)
                 await db.flush()
@@ -120,7 +120,7 @@ async def run_seed():
                         portfolio_id=portfolio.id, credit_id=credit.id,
                         quantity=max(50, qty // 2),
                         acquisition_price_eur=round(price * rng.uniform(0.9, 1.1), 2),
-                        acquisition_date=datetime(pd["vintage"], rng.randint(1, 12), rng.randint(1, 28), tzinfo=timezone.utc),
+                        acquisition_date=datetime(pd["vintage"], rng.randint(1, 12), rng.randint(1, 28)),
                     )
                     db.add(pos)
 

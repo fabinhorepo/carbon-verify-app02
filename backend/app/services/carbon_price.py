@@ -9,7 +9,7 @@ CACHE_TTL = 300
 
 
 def _get_previous_close() -> float:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.utcnow().date()
     yesterday = today - timedelta(days=1)
     seed_val = int(hashlib.md5(str(yesterday).encode()).hexdigest()[:8], 16)
     rng = random.Random(seed_val)
@@ -50,7 +50,7 @@ async def _fetch_from_trading_economics() -> dict | None:
                     ch = round(cp - pc, 2)
                     return {"price_eur": cp, "previous_close_eur": pc, "change_24h": ch, "change_pct_24h": round((ch / pc) * 100, 2),
                             "market": "EU ETS (ICE Endex)", "instrument": "EUA Futures", "currency": "EUR", "unit": "tCO2e",
-                            "source": "Trading Economics", "timestamp": datetime.now(timezone.utc).isoformat(), "cached": False}
+                            "source": "Trading Economics", "timestamp": datetime.utcnow().isoformat(), "cached": False}
     return None
 
 
@@ -67,7 +67,7 @@ async def _fetch_from_carboncredits() -> dict | None:
                     ch = round(price - pc, 2)
                     return {"price_eur": round(price, 2), "previous_close_eur": pc, "change_24h": ch, "change_pct_24h": round((ch / pc) * 100, 2),
                             "market": "EU ETS (ICE Endex)", "instrument": "EUA Futures", "currency": "EUR", "unit": "tCO2e",
-                            "source": "CarbonCredits.com", "timestamp": datetime.now(timezone.utc).isoformat(), "cached": False}
+                            "source": "CarbonCredits.com", "timestamp": datetime.utcnow().isoformat(), "cached": False}
     return None
 
 
@@ -78,7 +78,7 @@ def _generate_realistic_price() -> dict:
     return {"price_eur": price, "previous_close_eur": pc, "change_24h": ch, "change_pct_24h": round((ch / pc) * 100, 2),
             "day_high_eur": round(price * 1.015, 2), "day_low_eur": round(price * 0.985, 2),
             "market": "EU ETS (ICE Endex)", "instrument": "EUA Futures", "currency": "EUR", "unit": "tCO2e",
-            "source": "Carbon Verify (estimativa)", "timestamp": datetime.now(timezone.utc).isoformat(), "cached": False}
+            "source": "Carbon Verify (estimativa)", "timestamp": datetime.utcnow().isoformat(), "cached": False}
 
 
 def get_market_summary() -> dict:

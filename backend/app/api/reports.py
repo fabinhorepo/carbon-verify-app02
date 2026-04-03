@@ -58,7 +58,7 @@ async def create_report(
         report.file_path = file_path
         report.file_size_bytes = file_size
         report.status = ReportStatus.COMPLETED
-        report.completed_at = datetime.now(timezone.utc)
+        report.completed_at = datetime.utcnow()
     except Exception as e:
         report.status = ReportStatus.FAILED
         report.error_message = str(e)

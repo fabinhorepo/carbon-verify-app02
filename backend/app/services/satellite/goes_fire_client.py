@@ -72,7 +72,7 @@ async def get_fire_alerts_for_project(db: AsyncSession, project_id: int) -> dict
         obs = SatelliteObservation(
             project_id=project_id, satellite="GOES-R/FIRMS",
             observation_type="fire_hotspot", value=len(alerts),
-            unit="hotspots", observed_at=datetime.now(timezone.utc),
+            unit="hotspots", observed_at=datetime.utcnow(),
             metadata_json={"nearest_km": min(a["distance_km"] for a in alerts)},
         )
         db.add(obs)
@@ -139,6 +139,6 @@ def _generate_sample_hotspots(projects):
                     "brightness": rng.uniform(300, 400),
                     "confidence": rng.choice(["low", "nominal", "high"]),
                     "satellite": "GOES-R (sample)",
-                    "acq_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "acq_date": datetime.utcnow().strftime("%Y-%m-%d"),
                 })
     return hotspots

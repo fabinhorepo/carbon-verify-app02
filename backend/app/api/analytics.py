@@ -23,7 +23,7 @@ async def get_trends(
     from datetime import datetime, timezone, timedelta
     delta_map = {"1m": 30, "3m": 90, "6m": 180, "12m": 365}
     days = delta_map.get(period, 180)
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = datetime.utcnow() - timedelta(days=days)
 
     result = await db.execute(
         select(MetricSnapshot)

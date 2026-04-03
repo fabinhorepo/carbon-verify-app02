@@ -49,7 +49,7 @@ async def get_ghg_anomalies(db: AsyncSession) -> dict:
                 "gas": gas, "baseline_ppb": baseline, "current_ppb": round(current, 1),
                 "change_pct": round(((current - baseline) / baseline) * 100, 1),
                 "severity": "high" if current > baseline * 1.15 else "medium",
-                "satellite": "Sentinel-5P", "detected_at": datetime.now(timezone.utc).isoformat(),
+                "satellite": "Sentinel-5P", "detected_at": datetime.utcnow().isoformat(),
             })
 
     return {"anomalies": anomalies, "total": len(anomalies), "projects_monitored": len(projects)}
@@ -57,7 +57,7 @@ async def get_ghg_anomalies(db: AsyncSession) -> dict:
 
 def _generate_ghg_data(project):
     rng = random.Random(project.id * 23 + 5)
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     data = []
     for i in range(12):
         date = now - timedelta(days=30 * i)

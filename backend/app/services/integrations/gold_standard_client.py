@@ -75,7 +75,7 @@ async def import_gs_project(db: AsyncSession, gs_id: str) -> CarbonProject:
             proponent=project_data.get("developer", "N/A"),
             total_credits_issued=project_data.get("creditsIssued", 0),
             sdg_contributions=sdgs, integration_source="gold_standard",
-            last_synced_at=datetime.now(timezone.utc),
+            last_synced_at=datetime.utcnow(),
         )
     else:
         sdgs = {"7": "Affordable Energy", "13": "Climate Action"}
@@ -85,7 +85,7 @@ async def import_gs_project(db: AsyncSession, gs_id: str) -> CarbonProject:
             country="Kenya", registry="Gold Standard", methodology="GS Methodology",
             proponent="Gold Standard", total_credits_issued=50000,
             sdg_contributions=sdgs, integration_source="gold_standard",
-            last_synced_at=datetime.now(timezone.utc),
+            last_synced_at=datetime.utcnow(),
         )
 
     db.add(project)
@@ -99,7 +99,7 @@ async def import_gs_project(db: AsyncSession, gs_id: str) -> CarbonProject:
         db.add(alert)
 
     sync = IntegrationSync(source=IntegrationSource.GOLD_STANDARD, status="completed",
-                           last_sync_at=datetime.now(timezone.utc), projects_synced=1)
+                           last_sync_at=datetime.utcnow(), projects_synced=1)
     db.add(sync)
     await db.commit()
     await db.refresh(project)

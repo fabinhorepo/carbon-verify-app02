@@ -41,7 +41,7 @@ def _check_area(p: CarbonProject) -> Optional[FraudAlert]:
 def _check_vintage(p: CarbonProject) -> Optional[FraudAlert]:
     if not p.vintage_year:
         return None
-    age = datetime.now(timezone.utc).year - p.vintage_year
+    age = datetime.utcnow().year - p.vintage_year
     if age > 10:
         sev = FraudSeverity.HIGH if age > 15 else FraudSeverity.MEDIUM
         return FraudAlert(project_id=p.id, alert_type="vintage_age", severity=sev,

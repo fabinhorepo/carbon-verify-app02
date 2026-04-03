@@ -67,7 +67,7 @@ async def get_deforestation_alerts(db: AsyncSession) -> dict:
                 "ndvi_current": round(ndvi_current, 3), "ndvi_baseline": round(ndvi_baseline, 3),
                 "change_pct": round(change_pct, 1),
                 "severity": "critical" if change_pct < -40 else "high" if change_pct < -25 else "medium",
-                "detected_at": datetime.now(timezone.utc).isoformat(),
+                "detected_at": datetime.utcnow().isoformat(),
                 "satellite": "Sentinel-2",
             })
 
@@ -112,7 +112,7 @@ def _generate_ndvi_data(project, period):
     pt = project.project_type if isinstance(project.project_type, str) else project.project_type.value
     base_ndvi = {"REDD+": 0.75, "ARR": 0.65, "Blue Carbon": 0.50, "Biochar": 0.40}.get(pt, 0.55)
     data = []
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     for i in range(0, days, 16):
         date = now - timedelta(days=days - i)
         season = 1 + 0.1 * rng.choice([-1, 0, 0, 1])

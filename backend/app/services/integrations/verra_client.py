@@ -65,7 +65,7 @@ async def import_verra_project(db: AsyncSession, verra_id: str) -> CarbonProject
             registry="Verra", methodology=project_data.get("methodology", "N/A"),
             proponent=project_data.get("proponentName", "N/A"),
             total_credits_issued=project_data.get("totalVintageQuantity", 0),
-            integration_source="verra", last_synced_at=datetime.now(timezone.utc),
+            integration_source="verra", last_synced_at=datetime.utcnow(),
         )
     else:
         project = CarbonProject(
@@ -73,7 +73,7 @@ async def import_verra_project(db: AsyncSession, verra_id: str) -> CarbonProject
             name=f"Verra Project {verra_id}", project_type=ProjectType.REDD,
             country="Brazil", registry="Verra", methodology="VM0015",
             proponent="Verra Registry", total_credits_issued=100000,
-            integration_source="verra", last_synced_at=datetime.now(timezone.utc),
+            integration_source="verra", last_synced_at=datetime.utcnow(),
         )
 
     db.add(project)
@@ -87,7 +87,7 @@ async def import_verra_project(db: AsyncSession, verra_id: str) -> CarbonProject
         db.add(alert)
 
     sync = IntegrationSync(source=IntegrationSource.VERRA, status="completed",
-                           last_sync_at=datetime.now(timezone.utc), projects_synced=1)
+                           last_sync_at=datetime.utcnow(), projects_synced=1)
     db.add(sync)
     await db.commit()
     await db.refresh(project)
@@ -100,10 +100,10 @@ async def sync_verra_projects(db: AsyncSession) -> dict:
     projects = result.scalars().all()
     synced = 0
     for p in projects:
-        p.last_synced_at = datetime.now(timezone.utc)
+        p.last_synced_at = datetime.utcnow()
         synced += 1
     sync = IntegrationSync(source=IntegrationSource.VERRA, status="completed",
-                           last_sync_at=datetime.now(timezone.utc), projects_synced=synced)
+                           last_sync_at=datetime.utcnow(), projects_synced=synced)
     db.add(sync)
     await db.commit()
     return {"message": f"{synced} projetos sincronizados", "synced": synced}

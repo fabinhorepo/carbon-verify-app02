@@ -27,7 +27,7 @@ async def price_history(
 ):
     """Retorna histórico de preços armazenados."""
     from datetime import datetime, timezone, timedelta
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     delta_map = {"24h": timedelta(hours=24), "7d": timedelta(days=7), "30d": timedelta(days=30)}
     delta = delta_map.get(period, timedelta(hours=24))
     since = now - delta

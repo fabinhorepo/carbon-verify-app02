@@ -115,7 +115,7 @@ def _generate_credits_forecast(project):
         })
 
     future = []
-    current_year = datetime.now(timezone.utc).year
+    current_year = datetime.utcnow().year
     for i in range(1, min(6, end_year - current_year + 1)):
         fy = current_year + i
         if fy > end_year:

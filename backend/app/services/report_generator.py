@@ -9,7 +9,7 @@ from app.models.models import Report, CarbonProject, ProjectRating, FraudAlert, 
 async def generate_report(db: AsyncSession, report: Report) -> tuple[str, int]:
     """Gera relatório e retorna (file_path, file_size)."""
     os.makedirs("reports", exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     filename = f"reports/{report.report_type}_{timestamp}.{report.format}"
 
     data = await _gather_report_data(db, report)
@@ -54,7 +54,7 @@ async def _portfolio_data(db, report):
     )).all()
     return {
         "title": "Resumo de Portfólio",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.utcnow().isoformat(),
         "total_projects": len(projects),
         "projects": [
             {"name": p.name, "country": p.country, "type": p.project_type.value if hasattr(p.project_type, 'value') else str(p.project_type),
@@ -73,7 +73,7 @@ async def _fraud_data(db):
     )).all()
     return {
         "title": "Relatório de Alertas de Fraude",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.utcnow().isoformat(),
         "total_alerts": len(alerts),
         "alerts": [
             {"project": pn, "type": a.alert_type, "severity": a.severity.value if hasattr(a.severity, 'value') else a.severity,
@@ -96,7 +96,7 @@ async def _due_diligence_data(db, report):
     alerts = (await db.execute(select(FraudAlert).where(FraudAlert.project_id == pid))).scalars().all()
     return {
         "title": f"Due Diligence - {p.name}",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.utcnow().isoformat(),
         "project": {"name": p.name, "country": p.country, "type": p.project_type.value if hasattr(p.project_type, 'value') else str(p.project_type),
                      "registry": p.registry, "methodology": p.methodology, "area_ha": p.area_hectares,
                      "credits_issued": p.total_credits_issued, "vintage": p.vintage_year},
@@ -118,7 +118,7 @@ async def _executive_data(db):
     avg = (await db.execute(select(func.avg(ProjectRating.overall_score)))).scalar() or 0
     return {
         "title": "Resumo Executivo",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.utcnow().isoformat(),
         "total_projects": pc, "total_alerts": ac, "avg_quality_score": round(float(avg), 2),
     }
 

@@ -176,7 +176,7 @@ async def update_fraud_alert(alert_id: int, data: FraudAlertUpdate, db: AsyncSes
         alert.review_notes = data.review_notes
     if data.reviewed_by:
         alert.reviewed_by = data.reviewed_by
-    alert.reviewed_at = datetime.now(timezone.utc)
+    alert.reviewed_at = datetime.utcnow()
     await db.commit()
     await db.refresh(alert)
     pn = (await db.execute(select(CarbonProject.name).where(CarbonProject.id == alert.project_id))).scalar() or "N/A"

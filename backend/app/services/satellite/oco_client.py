@@ -25,7 +25,7 @@ async def get_xco2_data(db: AsyncSession, project_id: int) -> dict:
     current_xco2 = baseline_xco2 + project_effect
 
     # Série temporal mensal
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     timeseries = []
     for i in range(24):
         date = now - timedelta(days=30 * (23 - i))
