@@ -1,128 +1,282 @@
-"""Seed de dados para Carbon Verify - Produção."""
+"""Carbon Verify v3 — Seed Data (Production).
+
+Creates 30 projects with full data, ratings, fraud alerts,
+credit batches, portfolio positions, entities, compliance frameworks,
+jurisdictions, workspaces, and market prices.
+"""
 import random
 from datetime import datetime, timezone, timedelta
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import async_session
-from app.core.auth import get_password_hash
 from app.models.models import (
-    Organization, User, UserRole, CarbonProject, CarbonCredit,
-    Portfolio, PortfolioPosition, ProjectType
+    Organization, User, CarbonProject, CreditBatch, ProjectRating,
+    RatingPillar, FraudAlert, Portfolio, PortfolioPosition,
+    CarbonPriceHistory, SatelliteObservation, CorporateEmission,
+    CarbonBalance, IntegrationSync, MetricSnapshot,
+    Entity, EntityRelation, Jurisdiction, Workspace, WorkspaceMembership,
+    ComplianceFramework, MarketPrice,
+    ProjectType, RatingGrade, FraudSeverity, UserRole,
+    WorkspaceProfileType, EntityType, ComplianceFrameworkType,
+    IntegrationSource,
 )
-from app.services.rating_engine import calculate_rating
-from app.services.fraud_detection import run_fraud_detection
+from app.modules.rating.service import calculate_rating
+from app.modules.fraud_ops.service import run_fraud_detection
+import bcrypt
+
+def _hash_pw(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+rng = random.Random(42)
+
 
 PROJECTS_DATA = [
-    {"name": "Amazonia REDD+ Conservation", "type": ProjectType.REDD, "country": "Brazil", "lat": -3.4653, "lng": -62.2159, "area": 85000, "credits": 450000, "retired": 180000, "vintage": 2020, "registry": "Verra", "meth": "VM0015", "prop": "Conservation International", "buffer": 18, "mon": "Semestral", "ext": "VCS-1234"},
-    {"name": "Borneo Forest Protection", "type": ProjectType.REDD, "country": "Indonesia", "lat": 1.5, "lng": 110.0, "area": 120000, "credits": 680000, "retired": 250000, "vintage": 2019, "registry": "Verra", "meth": "VM0009", "prop": "WWF Indonesia", "buffer": 15, "mon": "Annual", "ext": "VCS-2345"},
-    {"name": "Kenya Cookstoves Program", "type": ProjectType.COOKSTOVE, "country": "Kenya", "lat": -1.2921, "lng": 36.8219, "area": None, "credits": 95000, "retired": 42000, "vintage": 2021, "registry": "Gold Standard", "meth": "GS Cookstove", "prop": "Burn Manufacturing", "buffer": None, "mon": "Annual", "ext": "GS-3456"},
-    {"name": "Indian Solar Energy Grid", "type": ProjectType.RENEWABLE_ENERGY, "country": "India", "lat": 28.6139, "lng": 77.2090, "area": 500, "credits": 320000, "retired": 280000, "vintage": 2018, "registry": "Gold Standard", "meth": "AMS-I.D", "prop": "ReNew Power", "buffer": None, "mon": "Annual", "ext": "GS-4567"},
-    {"name": "Colombian Blue Carbon Mangroves", "type": ProjectType.BLUE_CARBON, "country": "Colombia", "lat": 10.3910, "lng": -75.5144, "area": 12000, "credits": 65000, "retired": 15000, "vintage": 2022, "registry": "Verra", "meth": "VM0033", "prop": "Invemar", "buffer": 20, "mon": "Quarterly", "ext": "VCS-5678"},
-    {"name": "Peru Afforestation Project", "type": ProjectType.ARR, "country": "Peru", "lat": -13.5226, "lng": -71.9673, "area": 25000, "credits": 180000, "retired": 45000, "vintage": 2021, "registry": "Verra", "meth": "AR-ACM0003", "prop": "Reforestação Andina", "buffer": 22, "mon": "Semestral", "ext": "VCS-6789"},
-    {"name": "Vietnam Methane Capture", "type": ProjectType.METHANE, "country": "Vietnam", "lat": 10.8231, "lng": 106.6297, "area": 200, "credits": 120000, "retired": 95000, "vintage": 2020, "registry": "Gold Standard", "meth": "AMS-III.H", "prop": "Vietnam Energy JSC", "buffer": None, "mon": "Quarterly", "ext": "GS-7890"},
-    {"name": "Ethiopia Community Forestry", "type": ProjectType.ARR, "country": "Ethiopia", "lat": 9.0192, "lng": 38.7525, "area": 18000, "credits": 92000, "retired": 28000, "vintage": 2022, "registry": "Plan Vivo", "meth": "PV Standard", "prop": "Farm Africa", "buffer": 12, "mon": "Annual", "ext": "PV-8901"},
-    {"name": "Congo Basin REDD+", "type": ProjectType.REDD, "country": "Congo", "lat": -4.3175, "lng": 15.3137, "area": 350000, "credits": 1200000, "retired": 180000, "vintage": 2019, "registry": "Verra", "meth": "VM0006", "prop": "Wildlife Works", "buffer": 25, "mon": "Annual", "ext": "VCS-9012"},
-    {"name": "Honduras Improved Cookstoves", "type": ProjectType.COOKSTOVE, "country": "Honduras", "lat": 14.0723, "lng": -87.1921, "area": None, "credits": 35000, "retired": 12000, "vintage": 2023, "registry": "Gold Standard", "meth": "GS TPDDTEC", "prop": "Proyecto Mirador", "buffer": None, "mon": "Semestral", "ext": "GS-0123"},
-    {"name": "Madagascar Reforestation", "type": ProjectType.ARR, "country": "Madagascar", "lat": -18.8792, "lng": 47.5079, "area": 8000, "credits": 42000, "retired": 5000, "vintage": 2023, "registry": "Verra", "meth": "AR-ACM0003", "prop": "Eden Reforestation", "buffer": 18, "mon": "Semestral", "ext": "VCS-1011"},
-    {"name": "Cambodia Solar Farm", "type": ProjectType.RENEWABLE_ENERGY, "country": "Cambodia", "lat": 11.5564, "lng": 104.9282, "area": 250, "credits": 85000, "retired": 70000, "vintage": 2020, "registry": "Gold Standard", "meth": "AMS-I.D", "prop": "Cleanergy Asia", "buffer": None, "mon": "Annual", "ext": "GS-1112"},
-    {"name": "Ghana Biochar Initiative", "type": ProjectType.BIOCHAR, "country": "Ghana", "lat": 5.6037, "lng": -0.1870, "area": 3000, "credits": 28000, "retired": 8000, "vintage": 2023, "registry": "Verra", "meth": "VM0044", "prop": "Biochar Ghana Ltd", "buffer": 10, "mon": "Quarterly", "ext": "VCS-1213"},
-    {"name": "Philippines Wind Power", "type": ProjectType.RENEWABLE_ENERGY, "country": "Philippines", "lat": 14.5995, "lng": 120.9842, "area": 150, "credits": 200000, "retired": 185000, "vintage": 2017, "registry": "ACR", "meth": "ACR Wind", "prop": "AboitizPower", "buffer": None, "mon": "Annual", "ext": "ACR-1314"},
-    {"name": "Tanzania Community Forest", "type": ProjectType.REDD, "country": "Tanzania", "lat": -6.3690, "lng": 34.8888, "area": 45000, "credits": 250000, "retired": 80000, "vintage": 2021, "registry": "Verra", "meth": "VM0015", "prop": "TFCG", "buffer": 16, "mon": "Annual", "ext": "VCS-1415"},
-    {"name": "Bangladesh Mangrove Restoration", "type": ProjectType.BLUE_CARBON, "country": "Bangladesh", "lat": 21.4272, "lng": 92.0058, "area": 5000, "credits": 22000, "retired": 3000, "vintage": 2024, "registry": "Verra", "meth": "VM0033", "prop": "Sundarbans Foundation", "buffer": 20, "mon": "Quarterly", "ext": "VCS-1516"},
-    {"name": "Guatemala Forestry Initiative", "type": ProjectType.ARR, "country": "Guatemala", "lat": 14.6349, "lng": -90.5069, "area": 12000, "credits": 55000, "retired": 20000, "vintage": 2022, "registry": "Plan Vivo", "meth": "PV Standard", "prop": "Fundación Defensores", "buffer": 14, "mon": "Semestral", "ext": "PV-1617"},
-    {"name": "Mozambique Wind Energy", "type": ProjectType.RENEWABLE_ENERGY, "country": "Mozambique", "lat": -25.9692, "lng": 32.5732, "area": 300, "credits": 110000, "retired": 60000, "vintage": 2021, "registry": "Gold Standard", "meth": "AMS-I.D", "prop": "Globeleq", "buffer": None, "mon": "Annual", "ext": "GS-1718"},
-    {"name": "Nepal Biogas Program", "type": ProjectType.METHANE, "country": "Nepal", "lat": 27.7172, "lng": 85.3240, "area": None, "credits": 45000, "retired": 38000, "vintage": 2019, "registry": "Gold Standard", "meth": "AMS-I.I", "prop": "Nepal Biogas Support Program", "buffer": None, "mon": "Annual", "ext": "GS-1819"},
-    {"name": "Zambia Community REDD+", "type": ProjectType.REDD, "country": "Zambia", "lat": -15.3875, "lng": 28.3228, "area": 60000, "credits": 310000, "retired": 95000, "vintage": 2020, "registry": "Verra", "meth": "VM0009", "prop": "Biocarbon Partners", "buffer": 17, "mon": "Annual", "ext": "VCS-1920"},
-    # Projetos sem dados completos (para testar fraude)
-    {"name": "Unlicensed Forest Project X", "type": ProjectType.REDD, "country": "Brazil", "lat": -5.0, "lng": -55.0, "area": 500, "credits": 500000, "retired": 480000, "vintage": 2010, "registry": None, "meth": None, "prop": None, "buffer": None, "mon": None, "ext": None},
-    {"name": "Suspicious Energy Credits", "type": ProjectType.RENEWABLE_ENERGY, "country": "India", "lat": 19.0, "lng": 73.0, "area": 50, "credits": 200000, "retired": 190000, "vintage": 2012, "registry": None, "meth": None, "prop": None, "buffer": None, "mon": None, "ext": None},
-    {"name": "Overestimated Carbon Sink", "type": ProjectType.ARR, "country": "Mexico", "lat": 19.4326, "lng": -99.1332, "area": 100, "credits": 150000, "retired": 20000, "vintage": 2023, "registry": "Verra", "meth": "AR-ACM0003", "prop": "Project Dev MX", "buffer": 2, "mon": None, "ext": "VCS-BAD1"},
-    {"name": "Minimal Documentation Project", "type": ProjectType.OTHER, "country": "Uganda", "lat": 0.3476, "lng": 32.5825, "area": 15_000_000, "credits": 80000, "retired": 10000, "vintage": 2022, "registry": None, "meth": None, "prop": None, "buffer": None, "mon": None, "ext": None},
-    {"name": "Rwanda Agroforestry Carbon", "type": ProjectType.ARR, "country": "Rwanda", "lat": -1.9403, "lng": 29.8739, "area": 6000, "credits": 35000, "retired": 12000, "vintage": 2023, "registry": "Gold Standard", "meth": "AR-AMS0007", "prop": "One Tree Planted", "buffer": 15, "mon": "Semestral", "ext": "GS-2021"},
+    {"name": "Amazônia REDD+ Xingu", "type": ProjectType.REDD, "country": "Brazil", "registry": "Verra", "methodology": "VM0015", "area": 85000, "credits": 450000, "retired": 180000, "vintage": 2020, "lat": -3.5, "lng": -52.0, "proponent": "Conservation Intl Brazil", "buffer": 18, "region": "Pará", "monitoring": "Semestral"},
+    {"name": "Cerrado Restoration Project", "type": ProjectType.ARR, "country": "Brazil", "registry": "Verra", "methodology": "AR-ACM0003", "area": 12000, "credits": 85000, "retired": 34000, "vintage": 2021, "lat": -15.8, "lng": -47.9, "proponent": "Instituto Terra", "buffer": 20, "region": "Goiás", "monitoring": "Anual"},
+    {"name": "Atlantic Forest Blue Carbon", "type": ProjectType.BLUE_CARBON, "country": "Brazil", "registry": "Gold Standard", "methodology": "GS-Mangrove", "area": 5500, "credits": 25000, "retired": 12000, "vintage": 2022, "lat": -23.5, "lng": -46.6, "proponent": "SOS Mata Atlântica", "buffer": 15, "region": "São Paulo", "monitoring": "Trimestral"},
+    {"name": "Kalimantan Peatland Protection", "type": ProjectType.REDD, "country": "Indonesia", "registry": "Verra", "methodology": "VM0007", "area": 150000, "credits": 800000, "retired": 350000, "vintage": 2019, "lat": -2.0, "lng": 113.5, "proponent": "Permian Global", "buffer": 12, "region": "Borneo", "monitoring": "Anual"},
+    {"name": "Kenya Improved Cookstoves", "type": ProjectType.COOKSTOVE, "country": "Kenya", "registry": "Gold Standard", "methodology": "GS-TPDDTEC", "area": None, "credits": 120000, "retired": 90000, "vintage": 2021, "lat": -1.3, "lng": 36.8, "proponent": "BURN Manufacturing", "buffer": None, "region": "Nairobi", "monitoring": "Anual"},
+    {"name": "India Wind Power Gujarat", "type": ProjectType.RENEWABLE_ENERGY, "country": "India", "registry": "Verra", "methodology": "ACM0002", "area": None, "credits": 250000, "retired": 200000, "vintage": 2018, "lat": 22.3, "lng": 71.8, "proponent": "Suzlon Energy", "buffer": None, "region": "Gujarat", "monitoring": "Anual"},
+    {"name": "Colombia Cloud Forest REDD+", "type": ProjectType.REDD, "country": "Colombia", "registry": "Verra", "methodology": "VM0006", "area": 48000, "credits": 220000, "retired": 88000, "vintage": 2020, "lat": 5.0, "lng": -75.5, "proponent": "Fondo Acción", "buffer": 16, "region": "Antioquia", "monitoring": "Semestral"},
+    {"name": "Ethiopia Biochar Initiative", "type": ProjectType.BIOCHAR, "country": "Ethiopia", "registry": "Verra", "methodology": "VM0044", "area": 2500, "credits": 35000, "retired": 10000, "vintage": 2022, "lat": 9.0, "lng": 38.7, "proponent": "Biochar Africa", "buffer": 20, "region": "Amhara", "monitoring": "Trimestral"},
+    {"name": "Iceland DAC Orca Facility", "type": ProjectType.DAC, "country": "Iceland", "registry": "Gold Standard", "methodology": "GS-DAC", "area": 15, "credits": 4000, "retired": 3500, "vintage": 2023, "lat": 63.9, "lng": -21.9, "proponent": "Climeworks AG", "buffer": None, "region": "Reykjanes", "monitoring": "Trimestral"},
+    {"name": "Peru Methane Capture", "type": ProjectType.METHANE, "country": "Peru", "registry": "ACR", "methodology": "ACR-MCA", "area": 500, "credits": 60000, "retired": 25000, "vintage": 2021, "lat": -12.0, "lng": -77.0, "proponent": "Veolia LatAm", "buffer": None, "region": "Lima", "monitoring": "Semestral"},
+    {"name": "Congo Basin Forest Protection", "type": ProjectType.REDD, "country": "Congo", "registry": "Verra", "methodology": "VM0009", "area": 300000, "credits": 1500000, "retired": 450000, "vintage": 2019, "lat": -1.5, "lng": 24.0, "proponent": "Wildlife Works", "buffer": 10, "region": "Mai-Ndombe", "monitoring": "Anual"},
+    {"name": "Vietnam Solar Energy", "type": ProjectType.RENEWABLE_ENERGY, "country": "Vietnam", "registry": "Gold Standard", "methodology": "GS-Solar", "area": None, "credits": 180000, "retired": 150000, "vintage": 2020, "lat": 10.8, "lng": 106.7, "proponent": "Vietnam Green Power", "buffer": None, "region": "Ho Chi Minh", "monitoring": "Anual"},
+    {"name": "Honduras Community Forest", "type": ProjectType.ARR, "country": "Honduras", "registry": "Plan Vivo", "methodology": "PV-ARR", "area": 8000, "credits": 40000, "retired": 15000, "vintage": 2021, "lat": 14.1, "lng": -87.2, "proponent": "Lenca Communities", "buffer": 22, "region": "La Paz", "monitoring": "Semestral"},
+    {"name": "Mexico Avoided Deforestation", "type": ProjectType.REDD, "country": "Mexico", "registry": "Verra", "methodology": "VM0015", "area": 65000, "credits": 320000, "retired": 128000, "vintage": 2020, "lat": 18.5, "lng": -90.5, "proponent": "CONAFOR", "buffer": 14, "region": "Yucatán", "monitoring": "Anual"},
+    {"name": "Argentina Wind Farm Patagonia", "type": ProjectType.RENEWABLE_ENERGY, "country": "Argentina", "registry": "Verra", "methodology": "ACM0002", "area": None, "credits": 300000, "retired": 250000, "vintage": 2019, "lat": -43.3, "lng": -65.1, "proponent": "Genneia", "buffer": None, "region": "Chubut", "monitoring": "Anual"},
+    {"name": "Paraguay Chaco Conservation", "type": ProjectType.REDD, "country": "Paraguay", "registry": "Verra", "methodology": "VM0015", "area": 72000, "credits": 180000, "retired": 50000, "vintage": 2022, "lat": -21.5, "lng": -59.5, "proponent": "World Land Trust", "buffer": 5, "region": "Chaco", "monitoring": "Anual"},
+    {"name": "Cambodia Mangrove Restoration", "type": ProjectType.BLUE_CARBON, "country": "Cambodia", "registry": "Verra", "methodology": "VM0033", "area": 3200, "credits": 18000, "retired": 8000, "vintage": 2022, "lat": 11.5, "lng": 104.9, "proponent": "WorldFish", "buffer": 18, "region": "Kampot", "monitoring": "Semestral"},
+    {"name": "Chile Biochar Soil Carbon", "type": ProjectType.BIOCHAR, "country": "Chile", "registry": "ACR", "methodology": "ACR-Biochar", "area": 1800, "credits": 22000, "retired": 8000, "vintage": 2023, "lat": -33.4, "lng": -70.6, "proponent": "BioChar Chile", "buffer": 25, "region": "Santiago", "monitoring": "Trimestral"},
+    {"name": "Uganda Cookstove Distribution", "type": ProjectType.COOKSTOVE, "country": "Uganda", "registry": "Gold Standard", "methodology": "GS-TPDDTEC", "area": None, "credits": 95000, "retired": 70000, "vintage": 2020, "lat": 0.3, "lng": 32.6, "proponent": "UpEnergy", "buffer": None, "region": "Kampala", "monitoring": "Anual"},
+    {"name": "Ghana Cocoa Agroforestry", "type": ProjectType.ARR, "country": "Ghana", "registry": "Gold Standard", "methodology": "GS-ARR", "area": 15000, "credits": 55000, "retired": 20000, "vintage": 2021, "lat": 6.7, "lng": -1.6, "proponent": "Solidaridad", "buffer": 15, "region": "Ashanti", "monitoring": "Semestral"},
+    # Problematic/Low quality projects for fraud detection
+    {"name": "Unknown Forest Project Alpha", "type": ProjectType.REDD, "country": "Brazil", "registry": None, "methodology": None, "area": 15000000, "credits": 2000000, "retired": 1800000, "vintage": 2008, "lat": -5.0, "lng": -55.0, "proponent": None, "buffer": 2, "region": None, "monitoring": None},
+    {"name": "Suspicious Carbon Scheme Beta", "type": ProjectType.OTHER, "country": "Brazil", "registry": None, "methodology": None, "area": None, "credits": 500000, "retired": 450000, "vintage": 2010, "lat": -8.0, "lng": -50.0, "proponent": None, "buffer": None, "region": None, "monitoring": None},
+    {"name": "Unverified Renewable Gamma", "type": ProjectType.RENEWABLE_ENERGY, "country": "India", "registry": None, "methodology": None, "area": None, "credits": 150000, "retired": 130000, "vintage": 2009, "lat": 20.0, "lng": 78.0, "proponent": None, "buffer": None, "region": None, "monitoring": None},
+    {"name": "Ecuador Cloud Forest REDD", "type": ProjectType.REDD, "country": "Ecuador", "registry": "Verra", "methodology": "VM0015", "area": 22000, "credits": 110000, "retired": 45000, "vintage": 2021, "lat": -0.2, "lng": -78.5, "proponent": "Fundación Jocotoco", "buffer": 17, "region": "Pichincha", "monitoring": "Semestral"},
+    {"name": "Bolivia Deforestation Avoidance", "type": ProjectType.REDD, "country": "Bolivia", "registry": "Verra", "methodology": "VM0006", "area": 95000, "credits": 500000, "retired": 200000, "vintage": 2020, "lat": -16.5, "lng": -64.0, "proponent": "Noel Kempff Project", "buffer": 13, "region": "Santa Cruz", "monitoring": "Anual"},
+    {"name": "Costa Rica Reforestation", "type": ProjectType.ARR, "country": "Costa Rica", "registry": "Gold Standard", "methodology": "GS-ARR", "area": 6000, "credits": 30000, "retired": 12000, "vintage": 2022, "lat": 9.9, "lng": -84.1, "proponent": "FONAFIFO", "buffer": 20, "region": "San José", "monitoring": "Trimestral"},
+    {"name": "Tanzania Efficient Stoves", "type": ProjectType.COOKSTOVE, "country": "Tanzania", "registry": "Gold Standard", "methodology": "GS-TPDDTEC", "area": None, "credits": 75000, "retired": 55000, "vintage": 2021, "lat": -6.8, "lng": 37.7, "proponent": "EzyLife Foundation", "buffer": None, "region": "Dodoma", "monitoring": "Anual"},
+    {"name": "Philippines Mangrove Blue Carbon", "type": ProjectType.BLUE_CARBON, "country": "Philippines", "registry": "Verra", "methodology": "VM0033", "area": 4200, "credits": 20000, "retired": 7000, "vintage": 2023, "lat": 14.6, "lng": 121.0, "proponent": "ZSL Philippines", "buffer": 16, "region": "Luzon", "monitoring": "Semestral"},
+    {"name": "Uruguay Methane Reduction", "type": ProjectType.METHANE, "country": "Uruguay", "registry": "ACR", "methodology": "ACR-MCA", "area": 300, "credits": 45000, "retired": 20000, "vintage": 2022, "lat": -34.9, "lng": -56.2, "proponent": "UTE Uruguay", "buffer": None, "region": "Montevideo", "monitoring": "Semestral"},
+    {"name": "Dominican Republic Solar", "type": ProjectType.RENEWABLE_ENERGY, "country": "Dominican Republic", "registry": "Gold Standard", "methodology": "GS-Solar", "area": None, "credits": 55000, "retired": 40000, "vintage": 2022, "lat": 18.5, "lng": -69.9, "proponent": "DR Solar Corp", "buffer": None, "region": "Santo Domingo", "monitoring": "Anual"},
 ]
 
 
 async def run_seed():
-    """Popula o banco com dados iniciais se estiver vazio."""
     async with async_session() as db:
-        existing = await db.execute(select(CarbonProject).limit(1))
-        if existing.scalar_one_or_none():
-            return  # Já tem dados
+        existing = (await db.execute(select(Organization))).scalars().first()
+        if existing:
+            print("✅ Seed: dados já existem, pulando.")
+            return
 
-        # Org + User
-        org = Organization(name="Carbon Verify Demo", slug="carbon-verify-demo")
+        print("🌱 Seed v3: Criando dados iniciais...")
+
+        # ─── Jurisdictions ───────────────────────────────────────────
+        jurisdictions = []
+        for code, name, region_name in [
+            ("BR", "Brasil", "LatAm"), ("CO", "Colômbia", "LatAm"), ("PE", "Peru", "LatAm"),
+            ("MX", "México", "LatAm"), ("AR", "Argentina", "LatAm"), ("CL", "Chile", "LatAm"),
+            ("EC", "Equador", "LatAm"), ("BO", "Bolívia", "LatAm"),
+            ("US", "Estados Unidos", "North America"), ("EU", "União Europeia", "Europe"),
+            ("ID", "Indonésia", "Asia"), ("IN", "Índia", "Asia"),
+            ("KE", "Quênia", "Africa"), ("GH", "Gana", "Africa"),
+        ]:
+            j = Jurisdiction(code=code, name=name, region=region_name,
+                             data_sources={"inpe": True, "ibge": True} if code == "BR" else None,
+                             compliance_requirements={"sinare": True} if code == "BR" else None)
+            db.add(j)
+            jurisdictions.append(j)
+        await db.flush()
+
+        # ─── Organization & Users ────────────────────────────────────
+        org = Organization(name="Carbon Verify Demo", slug="cv-demo", plan="professional",
+                           rate_limit=120, locale="pt-BR", jurisdiction_id=jurisdictions[0].id)
         db.add(org)
         await db.flush()
 
-        user = User(
-            email="admin@carbonverify.com",
-            hashed_password=get_password_hash("admin123"),
-            full_name="Admin Carbon Verify",
-            role=UserRole.ADMIN,
-            organization_id=org.id,
-        )
-        db.add(user)
+        admin = User(email="admin@carbonverify.com", hashed_password=_hash_pw("admin123"),
+                     full_name="Admin Carbon Verify", role=UserRole.ADMIN, organization_id=org.id)
+        analyst = User(email="analyst@carbonverify.com", hashed_password=_hash_pw("analyst123"),
+                       full_name="Ana Silva (Analista)", role=UserRole.ANALYST, organization_id=org.id)
+        viewer = User(email="viewer@carbonverify.com", hashed_password=_hash_pw("viewer123"),
+                      full_name="Carlos Viewer", role=UserRole.VIEWER, organization_id=org.id)
+        db.add_all([admin, analyst, viewer])
         await db.flush()
 
-        # Portfolio
-        portfolio = Portfolio(name="Portfólio Principal", organization_id=org.id, description="Portfólio de demonstração")
+        # ─── Workspaces ──────────────────────────────────────────────
+        ws_profiles = [
+            ("Sustentabilidade", WorkspaceProfileType.SUSTAINABILITY, True),
+            ("Risco & Compliance", WorkspaceProfileType.RISK_COMPLIANCE, False),
+            ("Jurídico", WorkspaceProfileType.LEGAL, False),
+            ("Compras", WorkspaceProfileType.PROCUREMENT, False),
+            ("Auditoria", WorkspaceProfileType.EXTERNAL_AUDIT, False),
+        ]
+        workspaces = []
+        for ws_name, ws_type, is_default in ws_profiles:
+            ws = Workspace(name=ws_name, organization_id=org.id, profile_type=ws_type, is_default=is_default)
+            db.add(ws)
+            workspaces.append(ws)
+        await db.flush()
+
+        for ws in workspaces:
+            db.add(WorkspaceMembership(user_id=admin.id, workspace_id=ws.id, role="admin"))
+        db.add(WorkspaceMembership(user_id=analyst.id, workspace_id=workspaces[0].id, role="member"))
+        await db.flush()
+
+        # ─── Compliance Frameworks ───────────────────────────────────
+        frameworks = [
+            ComplianceFramework(code="csrd_e1", name="CSRD / ESRS E1", framework_type=ComplianceFrameworkType.CSRD_ESRS, version="2024"),
+            ComplianceFramework(code="sbti", name="SBTi Framework", framework_type=ComplianceFrameworkType.SBTI, version="2024"),
+            ComplianceFramework(code="icvcm", name="ICVCM Core Carbon Principles", framework_type=ComplianceFrameworkType.ICVCM, version="2023"),
+        ]
+        for f in frameworks:
+            db.add(f)
+        await db.flush()
+
+        # ─── Entities (Graph nodes) ──────────────────────────────────
+        entities = []
+        entity_data = [
+            ("Conservation Intl Brazil", EntityType.DEVELOPER, "BR"),
+            ("Permian Global", EntityType.DEVELOPER, "UK"),
+            ("Climeworks AG", EntityType.DEVELOPER, "CH"),
+            ("Verra", EntityType.REGISTRY, "US"),
+            ("Gold Standard", EntityType.REGISTRY, "CH"),
+            ("South Pole", EntityType.BROKER, "CH"),
+            ("Carbon Trade Exchange", EntityType.PLATFORM, "UK"),
+            ("NovaStar Corp", EntityType.BUYER, "BR"),
+            ("SCS Global Services", EntityType.VERIFIER, "US"),
+        ]
+        for e_name, e_type, e_jur in entity_data:
+            e = Entity(name=e_name, entity_type=e_type, jurisdiction_code=e_jur, risk_score=rng.uniform(0, 30))
+            db.add(e)
+            entities.append(e)
+        await db.flush()
+
+        # Entity relations
+        relations = [
+            (0, 3, "registered_with"), (1, 3, "registered_with"), (2, 4, "registered_with"),
+            (5, 0, "brokers_for"), (5, 1, "brokers_for"), (6, 5, "platform_for"),
+            (7, 5, "buys_through"), (8, 0, "verifies"), (8, 1, "verifies"),
+        ]
+        for src, tgt, rel_type in relations:
+            db.add(EntityRelation(source_entity_id=entities[src].id, target_entity_id=entities[tgt].id, relation_type=rel_type))
+        await db.flush()
+
+        # ─── Projects, Ratings, Fraud Alerts ─────────────────────────
+        projects = []
+        portfolio = Portfolio(name="Portfólio Principal", organization_id=org.id, description="Portfólio de créditos diversificado")
         db.add(portfolio)
         await db.flush()
 
-        rng = random.Random(42)
-
-        for pd in PROJECTS_DATA:
-            avail = pd["credits"] - pd["retired"]
-            start_d = datetime(pd["vintage"] - 2, 1, 1)
-            end_d = datetime(pd["vintage"] + rng.randint(10, 25), 12, 31)
+        for i, pd in enumerate(PROJECTS_DATA):
+            start_d = datetime(pd["vintage"] - rng.randint(1, 3), 1, 1, tzinfo=timezone.utc)
+            end_d = datetime(pd["vintage"] + rng.randint(10, 25), 12, 31, tzinfo=timezone.utc)
+            desc_text = f"Projeto de {pd['type'].value} localizado em {pd['country']}."
+            if pd.get("registry"):
+                desc_text += f" Registrado no {pd['registry']} com metodologia {pd.get('methodology', 'N/A')}."
+            desc_text += f" Área total: {pd.get('area', 'N/A')} hectares." if pd.get("area") else ""
+            add_just = None
+            if pd.get("methodology"):
+                add_just = f"O projeto demonstra adicionalidade através da análise de barreiras financeiras e institucionais. Sem o incentivo dos créditos de carbono, a atividade de {pd['type'].value} não seria viável. Metodologia {pd['methodology']} aplicada com validação independente."
+            baseline = None
+            if pd.get("area"):
+                baseline = f"O cenário de linha de base considera a tendência histórica de uso do solo na região de {pd.get('region', pd['country'])}. Taxas de desmatamento/degradação projetadas com base em dados de sensoriamento remoto dos últimos 10 anos."
 
             project = CarbonProject(
-                name=pd["name"], project_type=pd["type"], country=pd["country"],
-                latitude=pd["lat"], longitude=pd["lng"], area_hectares=pd["area"],
-                total_credits_issued=pd["credits"], total_credits_retired=pd["retired"],
-                total_credits_available=max(0, avail), vintage_year=pd["vintage"],
-                registry=pd["registry"], methodology=pd["meth"], proponent=pd["prop"],
-                buffer_pool_percentage=pd["buffer"], monitoring_frequency=pd["mon"],
-                external_id=pd["ext"], start_date=start_d, end_date=end_d,
-                region=pd["country"],
-                description=f"Projeto {pd['name']} localizado em {pd['country']}. Tipo: {pd['type'].value}. Metodologia: {pd['meth'] or 'N/A'}.",
-                baseline_scenario=f"Baseline conservador para projeto {pd['type'].value} em {pd['country']}. Cenário de referência sem intervenção do projeto." if pd["meth"] else None,
-                additionality_justification=f"Análise de barreiras demonstra que o projeto não seria viável sem receita de créditos de carbono. Barreiras: financeira, tecnológica, institucional." if pd["registry"] else None,
+                external_id=f"CV-{2024+i:04d}-{pd['country'][:2].upper()}", name=pd["name"],
+                description=desc_text, project_type=pd["type"], methodology=pd.get("methodology"),
+                registry=pd.get("registry"), country=pd["country"], region=pd.get("region"),
+                latitude=pd["lat"], longitude=pd["lng"], start_date=start_d, end_date=end_d,
+                proponent=pd.get("proponent"), total_credits_issued=pd["credits"],
+                total_credits_retired=pd["retired"], total_credits_available=pd["credits"] - pd["retired"],
+                vintage_year=pd["vintage"], area_hectares=pd.get("area"),
+                baseline_scenario=baseline, additionality_justification=add_just,
+                monitoring_frequency=pd.get("monitoring"), buffer_pool_percentage=pd.get("buffer"),
+                developer_entity_id=entities[i % len(entities)].id if i < 20 else None,
+                sinare_id=f"SINARE-{1000+i}" if pd["country"] == "Brazil" else None,
             )
             db.add(project)
             await db.flush()
+            projects.append(project)
 
             # Rating
-            rating = calculate_rating(project)
+            rating, pillars = calculate_rating(project)
             db.add(rating)
+            await db.flush()
+            for pillar in pillars:
+                pillar.rating_id = rating.id
+                db.add(pillar)
 
-            # Fraud alerts
+            # Fraud detection
             alerts = run_fraud_detection(project)
             for a in alerts:
                 db.add(a)
 
-            # Credits
-            num_credits = rng.randint(3, 8)
-            for ci in range(num_credits):
-                qty = pd["credits"] // num_credits + rng.randint(-1000, 1000)
-                price = rng.uniform(5, 35)
-                credit = CarbonCredit(
-                    serial_number=f"CV-{project.id}-{ci+1:04d}",
-                    project_id=project.id, vintage_year=pd["vintage"],
-                    quantity=max(100, qty), price_eur=round(price, 2),
-                    issuance_date=datetime(pd["vintage"], rng.randint(1, 12), rng.randint(1, 28)),
-                )
-                db.add(credit)
-                await db.flush()
+            # Credit batches and portfolio positions
+            credit = CreditBatch(
+                project_id=project.id, serial_number=f"CB-{project.id:04d}-{pd['vintage']}",
+                vintage_year=pd["vintage"], quantity=pd["credits"],
+                price_eur=round(rng.uniform(3, 28), 2), status="active",
+                issuance_date=datetime(pd["vintage"], rng.randint(1, 12), 1, tzinfo=timezone.utc),
+                verification_body=rng.choice(["SCS", "SGS", "TÜV SÜD", "DNV"]) if pd.get("registry") else None,
+            )
+            db.add(credit)
+            await db.flush()
 
-                # Posição no portfólio (70% dos créditos)
-                if rng.random() < 0.7:
-                    pos = PortfolioPosition(
-                        portfolio_id=portfolio.id, credit_id=credit.id,
-                        quantity=max(50, qty // 2),
-                        acquisition_price_eur=round(price * rng.uniform(0.9, 1.1), 2),
-                        acquisition_date=datetime(pd["vintage"], rng.randint(1, 12), rng.randint(1, 28)),
-                    )
-                    db.add(pos)
+            # Add some projects to portfolio
+            if i < 20 and rng.random() > 0.3:
+                qty = rng.randint(500, 5000)
+                pos = PortfolioPosition(
+                    portfolio_id=portfolio.id, credit_id=credit.id,
+                    quantity=qty, acquisition_price_eur=credit.price_eur,
+                    acquisition_date=datetime(pd["vintage"], rng.randint(1, 12), rng.randint(1, 28), tzinfo=timezone.utc),
+                )
+                db.add(pos)
+
+            # Market prices
+            for _ in range(rng.randint(1, 3)):
+                mp = MarketPrice(
+                    project_id=project.id,
+                    project_type=pd["type"].value,
+                    grade=rating.grade.value,
+                    vintage_year=pd["vintage"],
+                    price_eur=round(credit.price_eur * rng.uniform(0.8, 1.3), 2),
+                    volume=rng.randint(100, 10000),
+                    liquidity_score=round(rng.uniform(0.2, 1.0), 2),
+                    source="seed_data",
+                )
+                db.add(mp)
+
+        await db.flush()
+
+        # ─── Carbon Price History ────────────────────────────────────
+        base_price = 72.50
+        for i in range(30):
+            change = rng.uniform(-3, 3)
+            price = round(base_price + change, 2)
+            db.add(CarbonPriceHistory(
+                price_eur=price, previous_close_eur=base_price,
+                change_24h=round(change, 2), change_pct_24h=round(change / base_price * 100, 2),
+                day_high_eur=round(price + rng.uniform(0, 2), 2),
+                day_low_eur=round(price - rng.uniform(0, 2), 2),
+                market="EU ETS", source="seed_data",
+                recorded_at=datetime.now(timezone.utc) - timedelta(days=30 - i),
+            ))
+            base_price = price
+
+        # ─── Corporate Emissions ─────────────────────────────────────
+        for year in [2022, 2023, 2024]:
+            db.add(CorporateEmission(organization_id=org.id, scope="scope_1", amount_tco2e=rng.uniform(5000, 15000), year=year, category="Combustão", verified=year < 2024))
+            db.add(CorporateEmission(organization_id=org.id, scope="scope_2", amount_tco2e=rng.uniform(3000, 8000), year=year, category="Eletricidade", verified=year < 2024))
+            db.add(CorporateEmission(organization_id=org.id, scope="scope_3", amount_tco2e=rng.uniform(20000, 50000), year=year, category="Cadeia de Valor", verified=year < 2024))
+
+        # Carbon balances
+        for period in ["2022", "2023", "2024"]:
+            emissions = rng.uniform(30000, 70000)
+            offsets = rng.uniform(10000, 40000)
+            db.add(CarbonBalance(organization_id=org.id, period=period, total_emissions=round(emissions, 2), total_offsets=round(offsets, 2), net_balance=round(emissions - offsets, 2)))
 
         await db.commit()
-        print(f"✅ Seed completo: {len(PROJECTS_DATA)} projetos inseridos")
+        print(f"✅ Seed v3: {len(projects)} projetos, {len(jurisdictions)} jurisdições, {len(entities)} entidades, {len(workspaces)} workspaces criados.")

@@ -3,7 +3,7 @@ import { useState, createContext, useContext } from 'react';
 import {
   LayoutDashboard, FolderKanban, ShieldAlert, Briefcase, TrendingUp,
   Map, GitCompareArrows, FileText, Settings, BarChart3, Globe, Leaf,
-  Link2, Layers3, BadgeDollarSign, LogOut
+  Link2, Layers3, BadgeDollarSign, LogOut, Shield, Target, Scale, Users
 } from 'lucide-react';
 import './index.css';
 
@@ -24,6 +24,10 @@ import ESGIntegration from './pages/ESGIntegration';
 import Web3Dashboard from './pages/Web3Dashboard';
 import CarbonAccounting from './pages/CarbonAccounting';
 import Marketplace from './pages/Marketplace';
+import CompliancePage from './pages/Compliance';
+import MarketFrontier from './pages/MarketFrontier';
+import Workspaces from './pages/Workspaces';
+import RiskAdjusted from './pages/RiskAdjusted';
 
 interface User { id: number; email: string; full_name: string; role: string; organization_id: number; }
 interface AuthCtx { user: User | null; token: string | null; login: (t: string, u: User) => void; logout: () => void; }
@@ -34,14 +38,20 @@ const NAV_ITEMS = [
   { section: 'Principal', items: [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/projects', icon: FolderKanban, label: 'Projetos' },
-    { path: '/fraud-alerts', icon: ShieldAlert, label: 'Fraude' },
+    { path: '/fraud-ops', icon: ShieldAlert, label: 'Fraud Ops' },
     { path: '/portfolio', icon: Briefcase, label: 'Portfólio' },
+    { path: '/risk-adjusted', icon: Scale, label: 'Risk-Adjusted' },
   ]},
-  { section: 'Mercado & Dados', items: [
+  { section: 'Mercado & Compliance', items: [
     { path: '/market', icon: TrendingUp, label: 'Centro de Mercado' },
+    { path: '/frontier', icon: Target, label: 'Price-Quality Frontier' },
+    { path: '/compliance', icon: Shield, label: 'Compliance & CSRD' },
+    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+  ]},
+  { section: 'Ferramentas', items: [
     { path: '/map', icon: Map, label: 'Mapa de Projetos' },
     { path: '/compare', icon: GitCompareArrows, label: 'Comparador' },
-    { path: '/analytics', icon: BarChart3, label: 'Analytics' },
+    { path: '/workspaces', icon: Users, label: 'Workspaces' },
   ]},
   { section: 'Integrações', items: [
     { path: '/web3', icon: Layers3, label: 'Web3 / Blockchain' },
@@ -64,7 +74,7 @@ function Sidebar() {
         <div className="icon">CV</div>
         <div>
           <h1>Carbon Verify</h1>
-          <span>v2.0 · Production</span>
+          <span>v3.0 · Production</span>
         </div>
       </div>
       {NAV_ITEMS.map((section) => (
@@ -100,11 +110,16 @@ function ProtectedLayout() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/fraud-ops" element={<FraudAlerts />} />
           <Route path="/fraud-alerts" element={<FraudAlerts />} />
           <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/risk-adjusted" element={<RiskAdjusted />} />
           <Route path="/market" element={<MarketCenter />} />
+          <Route path="/frontier" element={<MarketFrontier />} />
+          <Route path="/compliance" element={<CompliancePage />} />
           <Route path="/map" element={<ProjectMap />} />
           <Route path="/compare" element={<ProjectComparison />} />
+          <Route path="/workspaces" element={<Workspaces />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/web3" element={<Web3Dashboard />} />
           <Route path="/esg" element={<ESGIntegration />} />

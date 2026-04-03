@@ -1,4 +1,4 @@
-"""Schemas Pydantic para validação e serialização - Carbon Verify Produção."""
+"""Schemas Pydantic v3 — Carbon Verify Production."""
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
@@ -47,6 +47,7 @@ class OrganizationResponse(BaseModel):
     name: str
     slug: str
     plan: str
+    locale: str = "pt-BR"
     api_key: Optional[str] = None
     class Config:
         from_attributes = True
@@ -56,6 +57,35 @@ class MemberInvite(BaseModel):
     full_name: str
     role: str = "analyst"
     password: str = Field(min_length=6)
+
+
+# ─── Workspace ───────────────────────────────────────────────────────────
+
+class WorkspaceCreate(BaseModel):
+    name: str
+    profile_type: str = "sustainability"
+    visible_modules: Optional[list] = None
+    allowed_actions: Optional[list] = None
+
+class WorkspaceResponse(BaseModel):
+    id: int
+    name: str
+    organization_id: int
+    profile_type: str
+    visible_modules: Optional[list] = None
+    allowed_actions: Optional[list] = None
+    is_default: bool
+    class Config:
+        from_attributes = True
+
+class WorkspaceMembershipResponse(BaseModel):
+    id: int
+    user_id: int
+    workspace_id: int
+    role: str
+    permissions: Optional[list] = None
+    class Config:
+        from_attributes = True
 
 
 # ─── Carbon Project ─────────────────────────────────────────────────────
@@ -110,22 +140,32 @@ class ProjectResponse(BaseModel):
 
 # ─── Rating ──────────────────────────────────────────────────────────────
 
+class RatingPillarResponse(BaseModel):
+    pillar_name: str
+    score: float
+    weight: float
+    max_score: float = 100.0
+    methodology_specific: bool = False
+    details: Optional[dict] = None
+
 class RatingResponse(BaseModel):
     id: int
     project_id: int
     overall_score: float
     grade: str
+    carbon_integrity_score: float
     additionality_score: float
     permanence_score: float
     leakage_score: float
     mrv_score: float
     co_benefits_score: float
     governance_score: float
-    baseline_integrity_score: float
     satellite_confidence_score: Optional[float] = None
     confidence_level: float
+    discount_factor: float = 1.0
     explanation: Optional[str] = None
     risk_flags: Optional[list] = None
+    pillars: Optional[list[RatingPillarResponse]] = None
     rated_at: Optional[datetime] = None
     class Config:
         from_attributes = True
@@ -150,6 +190,8 @@ class FraudAlertResponse(BaseModel):
     recommendation: Optional[str] = None
     detection_method: Optional[str] = None
     confidence: float
+    fraud_ops_score: Optional[float] = None
+    entity_graph_refs: Optional[list] = None
     reviewed_by: Optional[str] = None
     review_notes: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -160,6 +202,27 @@ class FraudAlertUpdate(BaseModel):
     status: Optional[str] = None
     review_notes: Optional[str] = None
     reviewed_by: Optional[str] = None
+
+
+# ─── Entity Graph ────────────────────────────────────────────────────────
+
+class EntityResponse(BaseModel):
+    id: int
+    name: str
+    entity_type: str
+    jurisdiction_code: Optional[str] = None
+    sanction_status: str
+    risk_score: float
+    class Config:
+        from_attributes = True
+
+class EntityRelationResponse(BaseModel):
+    id: int
+    source_entity_id: int
+    target_entity_id: int
+    relation_type: str
+    class Config:
+        from_attributes = True
 
 
 # ─── Portfolio ───────────────────────────────────────────────────────────
@@ -199,6 +262,74 @@ class PositionResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class RiskAdjustedTonnesResponse(BaseModel):
+    nominal_tonnes: float
+    risk_adjusted_tonnes: float
+    discount_factor_avg: float
+    grade_breakdown: dict
+    recommendations: list
+
+
+# ─── Compliance ──────────────────────────────────────────────────────────
+
+class ComplianceFrameworkResponse(BaseModel):
+    id: int
+    code: str
+    name: str
+    framework_type: str
+    version: str
+    disclosure_items: Optional[list] = None
+    class Config:
+        from_attributes = True
+
+class ComplianceMappingResponse(BaseModel):
+    id: int
+    framework_id: int
+    framework_name: Optional[str] = None
+    project_id: Optional[int] = None
+    portfolio_id: Optional[int] = None
+    disclosure_item: str
+    status: str
+    coverage_pct: float
+    details: Optional[dict] = None
+    evidence_summary: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class EvidenceResponse(BaseModel):
+    id: int
+    evidence_type: str
+    title: str
+    description: Optional[str] = None
+    source: Optional[str] = None
+    created_at: Optional[datetime] = None
+    class Config:
+        from_attributes = True
+
+
+# ─── Market Intelligence ────────────────────────────────────────────────
+
+class FrontierPointResponse(BaseModel):
+    project_id: Optional[int] = None
+    project_name: Optional[str] = None
+    project_type: str
+    grade: str
+    price_eur: float
+    rating_score: float
+    liquidity_score: Optional[float] = None
+    distance_to_frontier: float = 0.0
+    is_opportunity: bool = False
+
+class RebalanceSuggestion(BaseModel):
+    action: str  # sell, buy, hold, swap
+    project_id: Optional[int] = None
+    project_name: Optional[str] = None
+    current_grade: Optional[str] = None
+    target_grade: Optional[str] = None
+    quantity: int = 0
+    reason: str = ""
+    risk_adjusted_savings_eur: float = 0.0
+
 
 # ─── Dashboard ───────────────────────────────────────────────────────────
 
@@ -215,6 +346,8 @@ class DashboardMetrics(BaseModel):
     portfolio_value_eur: float
     portfolio_projects_count: int = 0
     avg_value_per_project: float = 0.0
+    compliance_coverage: Optional[dict] = None
+    risk_adjusted_tonnes: Optional[float] = None
 
 
 # ─── Reports ─────────────────────────────────────────────────────────────
@@ -224,6 +357,7 @@ class ReportCreate(BaseModel):
     report_type: str
     format: str = "pdf"
     parameters: Optional[dict] = None
+    compliance_framework: Optional[str] = None
 
 class ReportResponse(BaseModel):
     id: int
@@ -267,6 +401,29 @@ class CarbonBalanceResponse(BaseModel):
     total_emissions: float
     total_offsets: float
     net_balance: float
+
+
+# ─── Approval Flows ─────────────────────────────────────────────────────
+
+class ApprovalFlowCreate(BaseModel):
+    name: str
+    flow_type: str
+    required_steps: int = 1
+
+class ApprovalFlowResponse(BaseModel):
+    id: int
+    workspace_id: int
+    name: str
+    flow_type: str
+    required_steps: int
+    is_active: bool
+    steps: Optional[list] = None
+    class Config:
+        from_attributes = True
+
+class ApprovalStepUpdate(BaseModel):
+    status: str
+    decision_note: Optional[str] = None
 
 
 # ─── Paginated Response ─────────────────────────────────────────────────

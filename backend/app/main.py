@@ -1,4 +1,4 @@
-"""Carbon Verify - Aplicação Principal (Produção)."""
+"""Carbon Verify v3 — Main Application (Production)."""
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -12,7 +12,6 @@ from app.core.database import init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    # Tentar rodar seed no primeiro init
     try:
         from app.data.seed import run_seed
         await run_seed()
@@ -39,30 +38,68 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── Routes ──────────────────────────────────────────────────────────────
+# ─── Routes (v3 modular) ────────────────────────────────────────────────
 from app.api.auth import router as auth_router, org_router
-from app.api.projects import router as projects_router
-from app.api.fraud import router as fraud_router
-from app.api.portfolio import router as portfolio_router, dashboard_router
-from app.api.market import router as market_router
-from app.api.reports import router as reports_router
-from app.api.analytics import router as analytics_router
-from app.api.integrations import router as integrations_router, satellite_router, web3_router, esg_router
+from app.modules.projects.routes import router as projects_router
+from app.modules.fraud_ops.routes import router as fraud_ops_router
+from app.modules.portfolio.routes import (
+    portfolio_router, dashboard_router,
+    compliance_router, market_router, workspace_router,
+)
 
 PREFIX = settings.API_V1_PREFIX
+
+# Auth
 app.include_router(auth_router, prefix=PREFIX)
 app.include_router(org_router, prefix=PREFIX)
+
+# Core v3 modules
 app.include_router(projects_router, prefix=PREFIX)
-app.include_router(fraud_router, prefix=PREFIX)
+app.include_router(fraud_ops_router, prefix=PREFIX)
 app.include_router(portfolio_router, prefix=PREFIX)
 app.include_router(dashboard_router, prefix=PREFIX)
+app.include_router(compliance_router, prefix=PREFIX)
 app.include_router(market_router, prefix=PREFIX)
-app.include_router(reports_router, prefix=PREFIX)
-app.include_router(analytics_router, prefix=PREFIX)
-app.include_router(integrations_router, prefix=PREFIX)
-app.include_router(satellite_router, prefix=PREFIX)
-app.include_router(web3_router, prefix=PREFIX)
-app.include_router(esg_router, prefix=PREFIX)
+app.include_router(workspace_router, prefix=PREFIX)
+
+# Legacy routes that still work
+try:
+    from app.api.reports import router as reports_router
+    app.include_router(reports_router, prefix=PREFIX)
+except Exception as e:
+    print(f"⚠️ Legacy reports routes not loaded: {e}")
+
+try:
+    from app.api.analytics import router as analytics_router
+    app.include_router(analytics_router, prefix=PREFIX)
+except Exception as e:
+    print(f"⚠️ Legacy analytics routes not loaded: {e}")
+
+# Try to load optional integration routes
+try:
+    from app.api.integrations import router as integrations_router
+    app.include_router(integrations_router, prefix=PREFIX)
+    from app.api.integrations import satellite_router, web3_router, esg_router
+    app.include_router(satellite_router, prefix=PREFIX)
+    app.include_router(web3_router, prefix=PREFIX)
+    app.include_router(esg_router, prefix=PREFIX)
+except Exception as e:
+    print(f"⚠️ Integration routes not loaded: {e}")
+
+# Legacy fraud/portfolio/market routes
+try:
+    from app.api.fraud import router as legacy_fraud_router
+    app.include_router(legacy_fraud_router, prefix=PREFIX)
+except Exception:
+    pass
+
+try:
+    from app.api.portfolio import router as legacy_portfolio_router
+    from app.api.market import router as legacy_market_router
+    app.include_router(legacy_portfolio_router, prefix=PREFIX)
+    app.include_router(legacy_market_router, prefix=PREFIX)
+except Exception:
+    pass
 
 
 # ─── Health Check ────────────────────────────────────────────────────────
