@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     @property
     def is_postgres(self) -> bool:
-        return "postgresql" in self.DATABASE_URL
+        return "postgres" in self.DATABASE_URL
 
     @property
     def async_database_url(self) -> str:
