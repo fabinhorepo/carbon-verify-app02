@@ -1,0 +1,10 @@
+# Carbon Verify App01 - Production
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.env
+carbon_verify.db
+reports/
+*.egg-info/
+.venv/
