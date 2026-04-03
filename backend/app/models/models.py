@@ -156,8 +156,8 @@ class Organization(Base):
     locale = Column(String(10), default="pt-BR")
     settings = Column(JSON, nullable=True)
     jurisdiction_id = Column(Integer, ForeignKey("jurisdictions.id"), nullable=True)
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     users = relationship("User", back_populates="organization")
     portfolios = relationship("Portfolio", back_populates="organization")
@@ -177,7 +177,7 @@ class User(Base):
     role = Column(SQLEnum(UserRole), default=UserRole.ANALYST)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     organization = relationship("Organization", back_populates="users")
     audit_logs = relationship("AuditLog", back_populates="user")
@@ -199,7 +199,7 @@ class Workspace(Base):
     visible_modules = Column(JSON, nullable=True)
     allowed_actions = Column(JSON, nullable=True)
     is_default = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     organization = relationship("Organization", back_populates="workspaces")
     memberships = relationship("WorkspaceMembership", back_populates="workspace")
@@ -214,7 +214,7 @@ class WorkspaceMembership(Base):
     workspace_id = Column(Integer, ForeignKey("workspaces.id"), nullable=False)
     role = Column(String(50), default="member")
     permissions = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     user = relationship("User", back_populates="workspace_memberships")
     workspace = relationship("Workspace", back_populates="memberships")
@@ -239,7 +239,7 @@ class Jurisdiction(Base):
     data_sources = Column(JSON, nullable=True)  # INPE, IBGE, etc.
     compliance_requirements = Column(JSON, nullable=True)  # SINARE, etc.
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     organizations = relationship("Organization", back_populates="jurisdiction")
 
@@ -262,8 +262,8 @@ class CarbonProject(Base):
     region = Column(String(255), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    start_date = Column(DateTime, nullable=True)
-    end_date = Column(DateTime, nullable=True)
+    start_date = Column(DateTime(timezone=True), nullable=True)
+    end_date = Column(DateTime(timezone=True), nullable=True)
     proponent = Column(String(255), nullable=True)
     total_credits_issued = Column(Integer, default=0)
     total_credits_retired = Column(Integer, default=0)
@@ -281,14 +281,14 @@ class CarbonProject(Base):
     sinare_id = Column(String(100), nullable=True)  # Brazil SINARE
     sdg_contributions = Column(JSON, nullable=True)
     integration_source = Column(String(50), nullable=True)
-    last_synced_at = Column(DateTime, nullable=True)
+    last_synced_at = Column(DateTime(timezone=True), nullable=True)
 
     # Entity graph linkage
     developer_entity_id = Column(Integer, ForeignKey("entities.id"), nullable=True)
     jurisdiction_id = Column(Integer, ForeignKey("jurisdictions.id"), nullable=True)
 
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     credits = relationship("CreditBatch", back_populates="project")
     rating = relationship("ProjectRating", back_populates="project", uselist=False)
@@ -320,13 +320,13 @@ class CreditBatch(Base):
     vintage_year = Column(Integer, nullable=False)
     quantity = Column(Integer, nullable=False, default=1)
     status = Column(String(50), default="active")
-    issuance_date = Column(DateTime, nullable=True)
-    retirement_date = Column(DateTime, nullable=True)
+    issuance_date = Column(DateTime(timezone=True), nullable=True)
+    retirement_date = Column(DateTime(timezone=True), nullable=True)
     price_eur = Column(Float, nullable=True)
     verification_body = Column(String(255), nullable=True)
     token_address = Column(String(100), nullable=True)
     tokenized = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     project = relationship("CarbonProject", back_populates="credits")
     positions = relationship("PortfolioPosition", back_populates="credit")
@@ -362,8 +362,8 @@ class ProjectRating(Base):
     # Risk-adjusted discount factor
     discount_factor = Column(Float, default=1.0)
 
-    rated_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    rated_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     project = relationship("CarbonProject", back_populates="rating")
     pillars = relationship("RatingPillar", back_populates="rating")
@@ -382,7 +382,7 @@ class RatingPillar(Base):
     max_score = Column(Float, default=100.0)
     methodology_specific = Column(Boolean, default=False)
     details = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     rating = relationship("ProjectRating", back_populates="pillars")
 
@@ -402,8 +402,8 @@ class Entity(Base):
     sanction_status = Column(String(50), default="clear")  # clear, flagged, sanctioned
     risk_score = Column(Float, default=0.0)
     metadata_json = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     projects = relationship("CarbonProject", back_populates="developer_entity")
     relations_as_source = relationship("EntityRelation", foreign_keys="EntityRelation.source_entity_id", back_populates="source")
@@ -419,8 +419,8 @@ class EntityRelation(Base):
     target_entity_id = Column(Integer, ForeignKey("entities.id"), nullable=False)
     relation_type = Column(String(100), nullable=False)  # develops, brokers, buys_from, verifies
     metadata_json = Column(JSON, nullable=True)
-    first_seen = Column(DateTime, default=utcnow)
-    last_seen = Column(DateTime, default=utcnow)
+    first_seen = Column(DateTime(timezone=True), default=utcnow)
+    last_seen = Column(DateTime(timezone=True), default=utcnow)
 
     source = relationship("Entity", foreign_keys=[source_entity_id], back_populates="relations_as_source")
     target = relationship("Entity", foreign_keys=[target_entity_id], back_populates="relations_as_target")
@@ -448,9 +448,9 @@ class FraudAlert(Base):
 
     reviewed_by = Column(String(255), nullable=True)
     review_notes = Column(Text, nullable=True)
-    reviewed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     project = relationship("CarbonProject", back_populates="fraud_alerts")
 
@@ -476,8 +476,8 @@ class Portfolio(Base):
     total_value_eur = Column(Float, default=0)
     avg_quality_score = Column(Float, default=0)
     risk_exposure = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     organization = relationship("Organization", back_populates="portfolios")
     positions = relationship("PortfolioPosition", back_populates="portfolio")
@@ -492,9 +492,9 @@ class PortfolioPosition(Base):
     credit_id = Column(Integer, ForeignKey("credit_batches.id"), nullable=False)
     quantity = Column(Integer, nullable=False)
     acquisition_price_eur = Column(Float, nullable=True)
-    acquisition_date = Column(DateTime, nullable=True)
-    planned_retirement_date = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    acquisition_date = Column(DateTime(timezone=True), nullable=True)
+    planned_retirement_date = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     portfolio = relationship("Portfolio", back_populates="positions")
     credit = relationship("CreditBatch", back_populates="positions")
@@ -513,7 +513,7 @@ class PortfolioRating(Base):
     discount_factor_avg = Column(Float, default=1.0)
     grade_distribution = Column(JSON, nullable=True)
     concentration_risk = Column(JSON, nullable=True)
-    calculated_at = Column(DateTime, default=utcnow)
+    calculated_at = Column(DateTime(timezone=True), default=utcnow)
 
     portfolio = relationship("Portfolio", back_populates="portfolio_rating")
 
@@ -533,7 +533,7 @@ class ComplianceFramework(Base):
     disclosure_items = Column(JSON, nullable=True)  # list of disclosure line items
     requirements = Column(JSON, nullable=True)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     mappings = relationship("ComplianceMapping", back_populates="framework")
 
@@ -551,8 +551,8 @@ class ComplianceMapping(Base):
     coverage_pct = Column(Float, default=0.0)
     details = Column(JSON, nullable=True)
     evidence_summary = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
-    updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     framework = relationship("ComplianceFramework", back_populates="mappings")
     project = relationship("CarbonProject", back_populates="compliance_mappings")
@@ -574,7 +574,7 @@ class Evidence(Base):
     data_snapshot = Column(JSON, nullable=True)  # raw data if inline
     source = Column(String(255), nullable=True)
     rating_id = Column(Integer, ForeignKey("project_ratings.id"), nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     rating = relationship("ProjectRating", back_populates="evidences")
     evidence_links = relationship("EvidenceLink", back_populates="evidence")
@@ -588,7 +588,7 @@ class EvidenceLink(Base):
     evidence_id = Column(Integer, ForeignKey("evidences.id"), nullable=False)
     compliance_mapping_id = Column(Integer, ForeignKey("compliance_mappings.id"), nullable=False)
     relevance_note = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     evidence = relationship("Evidence", back_populates="evidence_links")
     compliance_mapping = relationship("ComplianceMapping", back_populates="evidence_links")
@@ -603,7 +603,7 @@ class ProjectDocument(Base):
     title = Column(String(500), nullable=False)
     file_path = Column(String(500), nullable=True)
     file_size_bytes = Column(Integer, nullable=True)
-    uploaded_at = Column(DateTime, default=utcnow)
+    uploaded_at = Column(DateTime(timezone=True), default=utcnow)
 
     project = relationship("CarbonProject", back_populates="documents")
 
@@ -625,7 +625,7 @@ class MarketPrice(Base):
     volume = Column(Integer, nullable=True)
     liquidity_score = Column(Float, nullable=True)  # 0-1
     source = Column(String(100), nullable=True)
-    recorded_at = Column(DateTime, default=utcnow)
+    recorded_at = Column(DateTime(timezone=True), default=utcnow)
 
     project = relationship("CarbonProject", back_populates="market_prices")
 
@@ -647,7 +647,7 @@ class CarbonPriceHistory(Base):
     day_low_eur = Column(Float, nullable=True)
     market = Column(String(100), default="EU ETS")
     source = Column(String(100), nullable=True)
-    recorded_at = Column(DateTime, default=utcnow)
+    recorded_at = Column(DateTime(timezone=True), default=utcnow)
 
     __table_args__ = (
         Index("idx_price_recorded", "recorded_at"),
@@ -667,7 +667,7 @@ class ApprovalFlow(Base):
     flow_type = Column(String(100), nullable=False)  # credit_purchase, portfolio_change, compliance_sign_off
     required_steps = Column(Integer, default=1)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     workspace = relationship("Workspace", back_populates="approval_flows")
     steps = relationship("ApprovalStep", back_populates="flow")
@@ -684,8 +684,8 @@ class ApprovalStep(Base):
     status = Column(SQLEnum(ApprovalStatus), default=ApprovalStatus.PENDING)
     decision_note = Column(Text, nullable=True)
     evidence_ids = Column(JSON, nullable=True)
-    decided_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     flow = relationship("ApprovalFlow", back_populates="steps")
     user = relationship("User", back_populates="approval_steps")
@@ -705,8 +705,8 @@ class SatelliteObservation(Base):
     value = Column(Float, nullable=True)
     unit = Column(String(50), nullable=True)
     metadata_json = Column(JSON, nullable=True)
-    observed_at = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, default=utcnow)
+    observed_at = Column(DateTime(timezone=True), nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     project = relationship("CarbonProject", back_populates="satellite_observations")
 
@@ -731,7 +731,7 @@ class CorporateEmission(Base):
     category = Column(String(100), nullable=True)
     source_description = Column(Text, nullable=True)
     verified = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     organization = relationship("Organization", back_populates="emissions")
 
@@ -745,7 +745,7 @@ class CarbonBalance(Base):
     total_emissions = Column(Float, default=0)
     total_offsets = Column(Float, default=0)
     net_balance = Column(Float, default=0)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     organization = relationship("Organization", back_populates="carbon_balances")
 
@@ -769,8 +769,8 @@ class Report(Base):
     xbrl_data = Column(JSON, nullable=True)
     organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=utcnow)
-    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
     error_message = Column(Text, nullable=True)
 
 
@@ -786,7 +786,7 @@ class AuditLog(Base):
     tenant_id = Column(Integer, nullable=True)  # organization_id for isolation
     details = Column(JSON, nullable=True)
     ip_address = Column(String(50), nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
     user = relationship("User", back_populates="audit_logs")
 
@@ -803,12 +803,12 @@ class IntegrationSync(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     source = Column(SQLEnum(IntegrationSource), nullable=False)
     status = Column(String(50), default="idle")
-    last_sync_at = Column(DateTime, nullable=True)
+    last_sync_at = Column(DateTime(timezone=True), nullable=True)
     projects_synced = Column(Integer, default=0)
     projects_failed = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
     details = Column(JSON, nullable=True)
-    created_at = Column(DateTime, default=utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
 
 
 class MetricSnapshot(Base):
@@ -818,7 +818,7 @@ class MetricSnapshot(Base):
     metric_name = Column(String(100), nullable=False)
     value = Column(Float, nullable=False)
     metadata_json = Column(JSON, nullable=True)
-    recorded_at = Column(DateTime, default=utcnow)
+    recorded_at = Column(DateTime(timezone=True), default=utcnow)
 
     __table_args__ = (
         Index("idx_metric_name_date", "metric_name", "recorded_at"),
