@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../utils/api';
+import ProjectLink from '../components/ProjectLink';
 
 const COLORS = ['#34d399', '#fbbf24', '#f87171', '#38bdf8', '#c084fc', '#fb923c'];
 
@@ -94,7 +95,7 @@ export default function Portfolio() {
         </div>
         {recs[activeRecTab]?.items?.map((r: any, i: number) => (
           <div key={i} className="card" style={{ marginBottom: '0.5rem', borderLeft: `3px solid ${r.risk_level === 'high' ? '#f87171' : r.risk_level === 'medium' ? '#fbbf24' : '#34d399'}` }}>
-            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{r.project_name}</div>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem' }}><ProjectLink projectId={r.project_id || 0} name={r.project_name} /></div>
             <div style={{ fontSize: '0.8rem', color: 'var(--cv-text-muted)', marginTop: '0.25rem' }}>Score: {r.current_score?.toFixed(0)} · Grade: {r.current_grade} · {r.total_quantity?.toLocaleString()} créditos</div>
             <div style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>{r.reason}</div>
           </div>
@@ -107,7 +108,7 @@ export default function Portfolio() {
         <div className="table-wrap">
           <table><thead><tr><th>Projeto</th><th>Tipo</th><th>País</th><th>Quantidade</th><th>Score</th><th>Grade</th><th>Preço (€)</th></tr></thead>
             <tbody>{m.positions?.map((p: any) => (
-              <tr key={p.position_id}><td style={{ fontWeight: 600 }}>{p.project_name}</td><td><span className="badge badge-blue">{p.project_type}</span></td>
+              <tr key={p.position_id}><td><ProjectLink projectId={p.project_id || 0} name={p.project_name} /></td><td><span className="badge badge-blue">{p.project_type}</span></td>
                 <td>{p.country}</td><td>{p.quantity?.toLocaleString()}</td><td>{p.score?.toFixed(1)}</td><td style={{ fontWeight: 800 }}>{p.grade}</td><td>€{p.price_eur?.toFixed(2)}</td></tr>
             ))}</tbody></table>
         </div>

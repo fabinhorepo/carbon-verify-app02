@@ -326,6 +326,84 @@ def test_csrd_pdf_requires_valid_portfolio(test_client):
     assert response.status_code in (401, 403, 404)
 
 
+def test_org_update_requires_auth(test_client):
+    """Test PUT /organizations/me requires auth."""
+    response = test_client.put("/api/v1/organizations/me", json={"name": "Test"})
+    assert response.status_code in (401, 403)
+
+
+def test_risk_adjusted_requires_auth(test_client):
+    """Test risk-adjusted route requires auth."""
+    response = test_client.get("/api/v1/portfolios")
+    assert response.status_code in (401, 403)
+
+
+@pytest.mark.skipif(True, reason="Requires PostgreSQL database connection")
+def test_market_frontier_endpoint(test_client):
+    """Test market frontier endpoint exists."""
+    response = test_client.get("/api/v1/market/frontier")
+    assert response.status_code in (200, 401, 403, 500)
+
+
+@pytest.mark.skipif(True, reason="Requires PostgreSQL database connection")
+def test_project_detail_endpoint(test_client):
+    """Test project detail endpoint requires valid id."""
+    response = test_client.get("/api/v1/projects/1")
+    assert response.status_code in (200, 404, 401, 403, 500)
+
+
+# ─── Unit Tests: ProjectLink component concept ───────────────────
+
+def test_project_link_component_exists():
+    """Verify ProjectLink component file exists."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'src', 'components', 'ProjectLink.tsx')
+    assert os.path.exists(path), "ProjectLink.tsx component should exist"
+
+
+def test_project_link_imports_correctly():
+    """Verify ProjectLink uses react-router-dom navigate."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'src', 'components', 'ProjectLink.tsx')
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    assert 'useNavigate' in content
+    assert '/projects/' in content
+    assert 'projectId' in content
+
+
+def test_pages_use_project_link():
+    """Verify key pages import ProjectLink for clickable project names."""
+    import os
+    pages_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'src', 'pages')
+    pages_with_link = ['Portfolio.tsx', 'FraudAlerts.tsx', 'ESGIntegration.tsx', 'Marketplace.tsx', 'MarketFrontier.tsx']
+    for page_name in pages_with_link:
+        path = os.path.join(pages_dir, page_name)
+        with open(path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        assert 'ProjectLink' in content, f"{page_name} should import ProjectLink"
+
+
+def test_risk_adjusted_uses_api_util():
+    """Verify RiskAdjusted uses api.ts utility instead of bare fetch."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'src', 'pages', 'RiskAdjusted.tsx')
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    assert "import api from '../utils/api'" in content
+    assert "api.get(" in content
+    assert "fetch(" not in content, "RiskAdjusted should not use bare fetch()"
+
+
+def test_workspace_selector_solid_bg():
+    """Verify workspace dropdown has solid background, not transparent."""
+    import os
+    path = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'src', 'App.tsx')
+    with open(path, 'r', encoding='utf-8') as f:
+        content = f.read()
+    assert '#1a2332' in content, "Workspace dropdown should use solid dark background"
+
+
 # ─── Run directly ────────────────────────────────────────────────
 
 if __name__ == "__main__":

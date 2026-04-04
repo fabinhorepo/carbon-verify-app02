@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Scale, ArrowUpDown, AlertTriangle, Calculator, BarChart3 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import api from '../utils/api';
 
 const gradeColors: Record<string, string> = {
   AAA: '#10b981', AA: '#34d399', A: '#6ee7b7', BBB: '#fbbf24', BB: '#f59e0b',
@@ -12,27 +13,27 @@ export default function RiskAdjustedPortfolio() {
   const [riskData, setRiskData] = useState<any>(null);
   const [targetImpact, setTargetImpact] = useState(100000);
   const [loading, setLoading] = useState(true);
-  const API = import.meta.env.VITE_API_URL || '';
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      fetch(`${API}/api/v1/portfolios`).then(r => r.json()),
-    ]).then(([portfolios]) => {
+    api.get('/portfolios').then(r => {
+      const portfolios = r.data || [];
       if (portfolios.length > 0) {
         const pid = portfolios[0].id;
         Promise.all([
-          fetch(`${API}/api/v1/portfolios/${pid}/metrics`).then(r => r.json()),
-          fetch(`${API}/api/v1/portfolios/${pid}/risk-adjusted?target_impact=${targetImpact}`).then(r => r.json()),
-        ]).then(([m, r]) => {
-          setMetrics(m);
-          setRiskData(r);
+          api.get(`/portfolios/${pid}/metrics`),
+          api.get(`/portfolios/${pid}/risk-adjusted`, { params: { target_impact: targetImpact } }),
+        ]).then(([mRes, rRes]) => {
+          setMetrics(mRes.data);
+          setRiskData(rRes.data);
           setLoading(false);
-        });
+        }).catch(() => { setError(true); setLoading(false); });
       } else {
+        setError(true);
         setLoading(false);
       }
-    }).catch(() => setLoading(false));
+    }).catch(() => { setError(true); setLoading(false); });
   }, [targetImpact]);
 
   const gradeChartData = metrics?.grade_distribution
@@ -41,97 +42,118 @@ export default function RiskAdjustedPortfolio() {
       }))
     : [];
 
+  const gradeColor = (grade: string) => {
+    if (['AAA', 'AA', 'A'].includes(grade)) return '#34d399';
+    if (['BBB', 'BB'].includes(grade)) return '#fbbf24';
+    return '#f87171';
+  };
+
+  if (error && !metrics) return (
+    <div className="fade-in">
+      <div className="page-header">
+        <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Scale size={28} style={{ color: '#06b6d4' }} /> Toneladas Ajustadas ao Risco
+        </h1>
+        <p className="page-subtitle">Cálculo BeZero-style: quanto carbono seu portfólio realmente compensa</p>
+      </div>
+      <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚖️</div>
+        <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Sem dados de portfólio</div>
+        <div style={{ color: 'var(--cv-text-muted)' }}>Crie um portfólio com posições para visualizar a análise de risco.</div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Scale className="text-cyan-400" /> Toneladas Ajustadas ao Risco
-          </h1>
-          <p className="text-gray-400 mt-1">Cálculo BeZero-style: quanto carbono seu portfólio realmente compensa</p>
-        </div>
+    <div className="fade-in">
+      <div className="page-header">
+        <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Scale size={28} style={{ color: '#06b6d4' }} /> Toneladas Ajustadas ao Risco
+        </h1>
+        <p className="page-subtitle">Cálculo BeZero-style: quanto carbono seu portfólio realmente compensa</p>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cyan-500"></div>
-        </div>
+        <div className="loading-page"><div className="spinner" /></div>
       ) : metrics && (
         <>
           {/* Key Metrics */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-5 backdrop-blur-sm">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Toneladas Nominais</p>
-              <p className="text-3xl font-bold text-white mt-2">{metrics.nominal_tonnes?.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">tCO2e compradas</p>
+          <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
+            <div className="card">
+              <div className="card-title">Toneladas Nominais</div>
+              <div className="card-value">{metrics.nominal_tonnes?.toLocaleString()}</div>
+              <div className="card-subtitle">tCO₂e compradas</div>
             </div>
-            <div className="bg-gray-800/50 border border-cyan-500/30 rounded-xl p-5 backdrop-blur-sm">
-              <p className="text-xs text-cyan-400 uppercase tracking-wider">Toneladas Risk-Adjusted</p>
-              <p className="text-3xl font-bold text-cyan-400 mt-2">{metrics.risk_adjusted_tonnes?.toLocaleString()}</p>
-              <p className="text-xs text-gray-500 mt-1">tCO2e efetivas</p>
+            <div className="card glow" style={{ borderColor: 'rgba(6, 182, 212, 0.3)' }}>
+              <div className="card-title" style={{ color: '#06b6d4' }}>Toneladas Risk-Adjusted</div>
+              <div className="card-value" style={{ color: '#06b6d4' }}>{metrics.risk_adjusted_tonnes?.toLocaleString()}</div>
+              <div className="card-subtitle">tCO₂e efetivas</div>
             </div>
-            <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-5 backdrop-blur-sm">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Fator de Desconto Médio</p>
-              <p className="text-3xl font-bold text-white mt-2">{(metrics.discount_factor_avg * 100).toFixed(1)}%</p>
-              <p className="text-xs text-gray-500 mt-1">eficiência do portfólio</p>
+            <div className="card">
+              <div className="card-title">Fator de Desconto Médio</div>
+              <div className="card-value">{((metrics.discount_factor_avg || 0) * 100).toFixed(1)}%</div>
+              <div className="card-subtitle">eficiência do portfólio</div>
             </div>
-            <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-5 backdrop-blur-sm">
-              <p className="text-xs text-gray-500 uppercase tracking-wider">Rating do Portfólio</p>
-              <p className={`text-3xl font-bold mt-2 ${
-                ['AAA', 'AA', 'A'].includes(metrics.portfolio_grade) ? 'text-emerald-400' :
-                ['BBB', 'BB'].includes(metrics.portfolio_grade) ? 'text-amber-400' : 'text-red-400'
-              }`}>{metrics.portfolio_grade}</p>
-              <p className="text-xs text-gray-500 mt-1">score {metrics.avg_quality_score?.toFixed(1)}/100</p>
+            <div className="card">
+              <div className="card-title">Rating do Portfólio</div>
+              <div className="card-value" style={{ color: gradeColor(metrics.portfolio_grade) }}>{metrics.portfolio_grade}</div>
+              <div className="card-subtitle">score {metrics.avg_quality_score?.toFixed(1)}/100</div>
             </div>
           </div>
 
           {/* Visual: Nominal vs Risk-Adjusted */}
-          <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <ArrowUpDown size={18} className="text-cyan-400" /> Comparação: Nominal vs Risk-Adjusted
-            </h2>
-            <div className="flex items-center gap-8">
-              <div className="flex-1">
-                <div className="relative">
-                  <div className="h-12 bg-gray-700 rounded-lg overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-gray-500 to-gray-400 rounded-lg flex items-center justify-center text-white font-semibold text-sm"
-                      style={{ width: '100%' }}>
-                      {metrics.nominal_tonnes?.toLocaleString()} tCO2e (Nominal)
-                    </div>
-                  </div>
-                  <div className="h-12 bg-gray-700 rounded-lg overflow-hidden mt-2">
-                    <div className="h-full bg-gradient-to-r from-cyan-600 to-cyan-400 rounded-lg flex items-center justify-center text-white font-semibold text-sm"
-                      style={{ width: `${(metrics.discount_factor_avg || 0) * 100}%` }}>
-                      {metrics.risk_adjusted_tonnes?.toLocaleString()} tCO2e (Risk-Adjusted)
-                    </div>
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <div className="card-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <ArrowUpDown size={18} style={{ color: '#06b6d4' }} /> Comparação: Nominal vs Risk-Adjusted
+            </div>
+            <div>
+              <div style={{ position: 'relative' }}>
+                <div style={{ height: '3rem', background: 'var(--cv-surface)', borderRadius: '8px', overflow: 'hidden', marginBottom: '0.5rem' }}>
+                  <div style={{
+                    height: '100%', width: '100%',
+                    background: 'linear-gradient(90deg, rgba(148,163,184,0.3), rgba(148,163,184,0.15))',
+                    borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 600, fontSize: '0.85rem',
+                  }}>
+                    {metrics.nominal_tonnes?.toLocaleString()} tCO₂e (Nominal)
                   </div>
                 </div>
-                <div className="flex items-center justify-between mt-3">
-                  <p className="text-xs text-gray-400">
-                    <AlertTriangle size={12} className="inline mr-1 text-amber-400" />
-                    Perda por risco: {((1 - (metrics.discount_factor_avg || 0)) * 100).toFixed(1)}% das toneladas
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Diferença: {((metrics.nominal_tonnes || 0) - (metrics.risk_adjusted_tonnes || 0)).toLocaleString()} tCO2e
-                  </p>
+                <div style={{ height: '3rem', background: 'var(--cv-surface)', borderRadius: '8px', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', width: `${(metrics.discount_factor_avg || 0) * 100}%`,
+                    background: 'linear-gradient(90deg, #0891b2, #06b6d4)',
+                    borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 600, fontSize: '0.85rem', color: '#fff', minWidth: '200px',
+                  }}>
+                    {metrics.risk_adjusted_tonnes?.toLocaleString()} tCO₂e (Risk-Adjusted)
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.75rem' }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--cv-text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <AlertTriangle size={14} style={{ color: '#fbbf24' }} />
+                  Perda por risco: {((1 - (metrics.discount_factor_avg || 0)) * 100).toFixed(1)}% das toneladas
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--cv-text-muted)' }}>
+                  Diferença: {((metrics.nominal_tonnes || 0) - (metrics.risk_adjusted_tonnes || 0)).toLocaleString()} tCO₂e
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Grade Distribution Chart */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <BarChart3 size={18} className="text-indigo-400" /> Distribuição por Rating
-              </h2>
+          {/* Grade Distribution Chart + Simulator */}
+          <div className="grid-2">
+            <div className="card">
+              <div className="card-title" style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <BarChart3 size={18} style={{ color: '#818cf8' }} /> Distribuição por Rating
+              </div>
               {gradeChartData.length > 0 && (
                 <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={gradeChartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis dataKey="grade" stroke="#9ca3af" fontSize={12} />
-                    <YAxis stroke="#9ca3af" fontSize={12} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
+                    <XAxis dataKey="grade" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                    <Tooltip contentStyle={{ background: '#1e293b', border: '1px solid rgba(148,163,184,0.2)', borderRadius: '8px', color: '#e2e8f0' }} />
                     <Bar dataKey="qty" name="Créditos" radius={[4, 4, 0, 0]}>
                       {gradeChartData.map((entry, i) => (
                         <Cell key={i} fill={entry.fill} />
@@ -143,31 +165,37 @@ export default function RiskAdjustedPortfolio() {
             </div>
 
             {/* Target Impact Calculator */}
-            <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-6 backdrop-blur-sm">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Calculator size={18} className="text-amber-400" /> Simulador de Impacto
-              </h2>
-              <p className="text-sm text-gray-400 mb-4">
+            <div className="card">
+              <div className="card-title" style={{ marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Calculator size={18} style={{ color: '#fbbf24' }} /> Simulador de Impacto
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--cv-text-muted)', marginBottom: '1rem' }}>
                 Quantos créditos nominais você precisa comprar para atingir um impacto climático real?
-              </p>
-              <label className="block text-sm text-gray-400 mb-2">Meta de impacto (tCO2e)</label>
+              </div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--cv-text-muted)', display: 'block', marginBottom: '0.25rem' }}>Meta de impacto (tCO₂e)</label>
               <input type="number" value={targetImpact} onChange={e => setTargetImpact(Number(e.target.value))}
-                className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white mb-4 focus:ring-2 focus:ring-cyan-500 focus:border-transparent" />
+                style={{ width: '100%', marginBottom: '1rem' }} />
 
               {riskData?.grade_breakdown && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm border-b border-gray-700 pb-2">
-                    <span className="text-gray-400">Total nominal necessário:</span>
-                    <span className="text-white font-bold">{riskData.total_nominal_needed?.toLocaleString()} tCO2e</span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--cv-border)' }}>
+                    <span style={{ color: 'var(--cv-text-muted)', fontSize: '0.85rem' }}>Total nominal necessário:</span>
+                    <span style={{ fontWeight: 700 }}>{riskData.total_nominal_needed?.toLocaleString()} tCO₂e</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-400">Fator de sobre-compra:</span>
-                    <span className="text-amber-400 font-bold">{riskData.over_purchase_ratio?.toFixed(2)}x</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid var(--cv-border)' }}>
+                    <span style={{ color: 'var(--cv-text-muted)', fontSize: '0.85rem' }}>Fator de sobre-compra:</span>
+                    <span style={{ fontWeight: 700, color: '#fbbf24' }}>{riskData.over_purchase_ratio?.toFixed(2)}x</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-3">
-                    Com a composição atual do portfólio, você precisa comprar {riskData.over_purchase_ratio?.toFixed(2)}x mais créditos
+                  <div style={{ fontSize: '0.75rem', color: 'var(--cv-text-muted)', marginTop: '0.5rem', padding: '0.75rem', background: 'var(--cv-surface)', borderRadius: '8px' }}>
+                    💡 Com a composição atual do portfólio, você precisa comprar <strong style={{ color: '#fbbf24' }}>{riskData.over_purchase_ratio?.toFixed(2)}x</strong> mais créditos
                     do que sua meta para compensar o risco de não-entrega.
-                  </p>
+                  </div>
+                </div>
+              )}
+
+              {!riskData?.grade_breakdown && (
+                <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--cv-text-muted)' }}>
+                  Aguardando dados de risco...
                 </div>
               )}
             </div>

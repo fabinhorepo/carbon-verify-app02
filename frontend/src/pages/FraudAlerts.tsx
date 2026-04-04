@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert, AlertTriangle, Clock, MapPin, FileWarning, ShieldOff, Flame, TreeDeciduous } from 'lucide-react';
 import api from '../utils/api';
+import ProjectLink from '../components/ProjectLink';
 
 const ICONS: any = { 'alert-triangle': AlertTriangle, clock: Clock, 'map-pin': MapPin, 'file-warning': FileWarning, 'shield-off': ShieldOff, flame: Flame, 'tree-deciduous': TreeDeciduous, repeat: Clock };
 
@@ -65,7 +66,7 @@ export default function FraudAlerts() {
             <div>
               <div style={{ fontWeight: 700, fontSize: '0.95rem', marginBottom: '0.25rem' }}>{a.title}</div>
               <div style={{ fontSize: '0.8rem', color: 'var(--cv-text-muted)', marginBottom: '0.5rem' }}>
-                Projeto: <strong>{a.project_name}</strong> · Confiança: {(a.confidence * 100).toFixed(0)}%
+                Projeto: <ProjectLink projectId={a.project_id || 0} name={a.project_name} /> · Confiança: {(a.confidence * 100).toFixed(0)}%
               </div>
               <p style={{ fontSize: '0.85rem', color: 'var(--cv-text)', lineHeight: 1.5 }}>{a.description}</p>
               {a.recommendation && <p style={{ fontSize: '0.8rem', color: 'var(--cv-primary)', marginTop: '0.5rem' }}>💡 {a.recommendation}</p>}

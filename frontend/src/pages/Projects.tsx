@@ -67,7 +67,7 @@ export default function Projects() {
           <tbody>
             {data.items?.map((p: any) => (
               <tr key={p.id} onClick={() => navigate(`/projects/${p.id}`)} style={{ cursor: 'pointer' }}>
-                <td style={{ fontWeight: 600, maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</td>
+                <td style={{ fontWeight: 600, maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--cv-accent)', cursor: 'pointer' }}>{p.name}</td>
                 <td><span className="badge badge-blue">{p.project_type}</span></td>
                 <td>{p.country}</td>
                 <td>{p.registry || '—'}</td>

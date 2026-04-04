@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Search, ChevronLeft, ChevronRight, Globe } from 'lucide-react';
 import api from '../utils/api';
+import ProjectLink from '../components/ProjectLink';
 
 interface MarketCredit {
+  id: number;
   rank: number;
   name: string;
   registry: string;
@@ -66,6 +68,7 @@ export default function Marketplace() {
       const projects = data.items || data || [];
 
       const mapped: MarketCredit[] = projects.map((p: any, i: number) => ({
+        id: p.id || i,
         rank: i + 1,
         name: p.name,
         registry: p.registry || 'N/A',
@@ -235,8 +238,8 @@ export default function Marketplace() {
                       {pageItems.map((c, i) => (
                         <tr key={i}>
                           <td style={{ color: 'var(--cv-text-muted)', fontSize: '0.8rem' }}>{(page - 1) * PAGE_SIZE + i + 1}</td>
-                          <td style={{ fontWeight: 600, maxWidth: '250px' }}>
-                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                          <td style={{ maxWidth: '250px' }}>
+                            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}><ProjectLink projectId={c.id} name={c.name} /></div>
                           </td>
                           <td><span className="badge badge-blue" style={{ fontSize: '0.65rem' }}>{c.registry}</span></td>
                           <td>{c.country}</td>

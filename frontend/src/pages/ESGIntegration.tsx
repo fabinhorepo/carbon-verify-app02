@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import api from '../utils/api';
+import ProjectLink from '../components/ProjectLink';
 
 export default function ESGIntegration() {
   const [balance, setBalance] = useState<any>(null);
@@ -59,7 +60,7 @@ export default function ESGIntegration() {
           <div className="card-title" style={{ marginBottom: '1rem' }}>Projetos Recomendados para Compensação</div>
           <div className="table-wrap"><table><thead><tr><th>Projeto</th><th>País</th><th>Tipo</th><th>Score</th><th>Grade</th><th>Créditos Disponíveis</th></tr></thead>
             <tbody>{recs.recommended_projects.map((p: any) => (
-              <tr key={p.project_id}><td style={{ fontWeight: 600 }}>{p.name}</td><td>{p.country}</td>
+              <tr key={p.project_id}><td><ProjectLink projectId={p.project_id} name={p.name} /></td><td>{p.country}</td>
                 <td><span className="badge badge-blue">{p.project_type}</span></td><td>{p.score?.toFixed(1)}</td>
                 <td style={{ fontWeight: 800 }}>{p.grade}</td><td>{p.available_credits?.toLocaleString()}</td></tr>
             ))}</tbody></table></div>
