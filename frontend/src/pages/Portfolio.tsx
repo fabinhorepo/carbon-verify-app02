@@ -5,17 +5,34 @@ import api from '../utils/api';
 const COLORS = ['#34d399', '#fbbf24', '#f87171', '#38bdf8', '#c084fc', '#fb923c'];
 
 export default function Portfolio() {
+  const [portfolios, setPortfolios] = useState<any[]>([]);
   const [detail, setDetail] = useState<any>(null);
+  const [error, setError] = useState(false);
+  const [activeRecTab, setActiveRecTab] = useState('sell');
 
   useEffect(() => {
     api.get('/portfolios').then(r => {
-      if (r.data.length > 0) { loadDetail(r.data[0].id); }
-    }).catch(() => {});
+      const list = r.data || [];
+      setPortfolios(list);
+      if (list.length > 0) loadDetail(list[0].id);
+      else setError(true);
+    }).catch(() => setError(true));
   }, []);
 
   const loadDetail = (id: number) => {
-    api.get(`/portfolios/${id}`).then(r => setDetail(r.data)).catch(() => {});
+    api.get(`/portfolios/${id}`).then(r => setDetail(r.data)).catch(() => setError(true));
   };
+
+  if (error && !detail) return (
+    <div className="fade-in">
+      <div className="page-header"><h1 className="page-title">Portfólio</h1><p className="page-subtitle">Gestão de créditos de carbono</p></div>
+      <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📊</div>
+        <div style={{ fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Nenhum portfólio encontrado</div>
+        <div style={{ color: 'var(--cv-text-muted)' }}>Crie um portfólio na API ou aguarde o carregamento dos dados.</div>
+      </div>
+    </div>
+  );
 
   if (!detail) return <div className="loading-page"><div className="spinner" /></div>;
 
@@ -24,11 +41,22 @@ export default function Portfolio() {
   const gradeData = Object.entries(m.grade_distribution || {}).map(([k, v]) => ({ name: k, value: v as number }));
   const recs = m.recommendations_grouped || {};
   const actionLabels: any = { sell: '🔴 Vender', rebalance: '🟡 Rebalancear', hold: '🟢 Manter' };
-  const [activeRecTab, setActiveRecTab] = useState('sell');
 
   return (
     <div className="fade-in">
-      <div className="page-header"><h1 className="page-title">Portfólio</h1><p className="page-subtitle">{detail.portfolio.name}</p></div>
+      <div className="page-header">
+        <h1 className="page-title">Portfólio</h1>
+        <p className="page-subtitle">{detail.portfolio.name}</p>
+        {portfolios.length > 1 && (
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+            {portfolios.map(p => (
+              <button key={p.id} className={`btn ${p.id === detail?.portfolio?.id ? 'btn-primary' : ''}`}
+                style={{ fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
+                onClick={() => loadDetail(p.id)}>{p.name}</button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
         <div className="card"><div className="card-title">Total Créditos</div><div className="card-value">{m.total_credits?.toLocaleString()}</div></div>

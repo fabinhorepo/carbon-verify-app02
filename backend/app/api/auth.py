@@ -118,6 +118,30 @@ async def get_my_organization(
     return OrganizationResponse.model_validate(org)
 
 
+@org_router.put("/me")
+async def update_my_organization(
+    data: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="Apenas admins podem editar a organização")
+    result = await db.execute(select(Organization).where(Organization.id == current_user.organization_id))
+    org = result.scalar_one_or_none()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organização não encontrada")
+    if "name" in data and data["name"]:
+        org.name = data["name"]
+    if "slug" in data and data["slug"]:
+        org.slug = data["slug"]
+    if "plan" in data and data["plan"]:
+        org.plan = data["plan"]
+    db.add(AuditLog(user_id=current_user.id, action="update_organization", resource_type="organization", resource_id=org.id))
+    await db.commit()
+    await db.refresh(org)
+    return OrganizationResponse.model_validate(org)
+
+
 @org_router.get("/me/members")
 async def list_members(
     db: AsyncSession = Depends(get_db),

@@ -176,8 +176,8 @@ function WorkspaceSelector() {
       {open && (
         <div style={{
           position: 'absolute', left: '1rem', right: '1rem', marginTop: '4px',
-          background: 'var(--cv-bg-card)', border: '1px solid var(--cv-border)',
-          borderRadius: '8px', boxShadow: '0 8px 24px rgba(0,0,0,0.3)', zIndex: 100,
+          background: '#1a2332', border: '1px solid rgba(148, 163, 184, 0.2)',
+          borderRadius: '8px', boxShadow: '0 12px 32px rgba(0,0,0,0.5)', zIndex: 100,
           overflow: 'hidden',
         }}>
           {allProfiles.map(p => (
@@ -186,13 +186,13 @@ function WorkspaceSelector() {
               onClick={() => { setActiveProfile(p); setOpen(false); }}
               style={{
                 width: '100%', padding: '0.6rem 0.75rem', border: 'none',
-                background: p.id === activeProfile.id ? 'rgba(6, 182, 212, 0.12)' : 'transparent',
+                background: p.id === activeProfile.id ? 'rgba(6, 182, 212, 0.15)' : '#1a2332',
                 cursor: 'pointer', textAlign: 'left', color: 'var(--cv-text)',
-                borderBottom: '1px solid var(--cv-border)', display: 'block',
+                borderBottom: '1px solid rgba(148, 163, 184, 0.1)', display: 'block',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={e => { if (p.id !== activeProfile.id) (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
-              onMouseLeave={e => { if (p.id !== activeProfile.id) (e.target as HTMLElement).style.background = 'transparent'; }}
+              onMouseEnter={e => { if (p.id !== activeProfile.id) (e.target as HTMLElement).style.background = '#1e293b'; }}
+              onMouseLeave={e => { if (p.id !== activeProfile.id) (e.target as HTMLElement).style.background = '#1a2332'; }}
             >
               <div style={{ fontWeight: p.id === activeProfile.id ? 600 : 400, fontSize: '0.8rem' }}>{p.label}</div>
               <div style={{ fontSize: '0.7rem', color: 'var(--cv-text-muted)', marginTop: '2px' }}>{p.description}</div>

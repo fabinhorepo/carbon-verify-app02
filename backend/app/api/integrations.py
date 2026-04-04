@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.models.models import CarbonProject, IntegrationSync, User
+from app.models.models import CarbonProject, IntegrationSync, User, CreditBatch, PortfolioPosition, ProjectRating
 
 router = APIRouter(prefix="/integrations", tags=["Integrações"])
 
@@ -186,19 +186,19 @@ async def carbon_balance(db: AsyncSession = Depends(get_db), current_user: User 
         .where(CorporateEmission.organization_id == current_user.organization_id)
     )).scalar() or 0
 
-    offsets = (await db.execute(
-        select(func.sum(PortfolioPosition.quantity))
-        .join(CarbonCredit, PortfolioPosition.credit_id == CarbonCredit.id)
-        .where(CarbonCredit.status == "retired")
+    # Use CarbonBalance offsets for the org
+    offsets_result = (await db.execute(
+        select(func.sum(CarbonBalance.total_offsets))
+        .where(CarbonBalance.organization_id == current_user.organization_id)
     )).scalar() or 0
 
-    net = emissions - offsets
+    net = float(emissions) - float(offsets_result)
     return {
         "total_emissions_tco2e": round(float(emissions), 2),
-        "total_offsets_tco2e": round(float(offsets), 2),
-        "net_balance_tco2e": round(float(net), 2),
+        "total_offsets_tco2e": round(float(offsets_result), 2),
+        "net_balance_tco2e": round(net, 2),
         "status": "net_zero" if net <= 0 else "positive_emissions",
-        "offset_percentage": round((offsets / max(emissions, 1)) * 100, 1),
+        "offset_percentage": round((float(offsets_result) / max(float(emissions), 1)) * 100, 1),
     }
 
 
@@ -217,16 +217,14 @@ async def offset_recommendations(db: AsyncSession = Depends(get_db), current_use
     result = await db.execute(
         select(CarbonProject, ProjectRating)
         .join(ProjectRating, CarbonProject.id == ProjectRating.project_id)
-        .where(CarbonProject.total_credits_available > 0)
         .order_by(ProjectRating.overall_score.desc())
         .limit(10)
     )
-    from app.models.models import ProjectRating as PR
     projects = [
         {
             "project_id": p.id, "name": p.name, "country": p.country,
             "project_type": p.project_type.value if hasattr(p.project_type, 'value') else str(p.project_type),
-            "available_credits": p.total_credits_available,
+            "available_credits": max(0, (p.total_credits_issued or 0) - (p.total_credits_retired or 0)),
             "score": r.overall_score, "grade": r.grade.value if hasattr(r.grade, 'value') else str(r.grade),
         }
         for p, r in result.all()
